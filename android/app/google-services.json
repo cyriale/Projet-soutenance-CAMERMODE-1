@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1072766498193",
+    "project_id": "camermode-2a49d",
+    "storage_bucket": "camermode-2a49d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1072766498193:android:809fffbcbc98a2d0131630",
+        "android_client_info": {
+          "package_name": "com.cyriale.camermode"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARaCxPO9lijOUPbOH-RmbyIliuPpTQzl0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
