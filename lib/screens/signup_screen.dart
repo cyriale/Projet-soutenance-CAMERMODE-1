@@ -1,5 +1,4 @@
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../compronents/app_button.dart';
@@ -8,6 +7,7 @@ import '../core/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/verification_service.dart';
 import '../models/user_model.dart';
+import 'package:flutter/foundation.dart';
 
 class SignupScreen extends StatefulWidget {
   final UserRole selectedRole;
@@ -31,7 +31,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final VerificationService _verificationService = VerificationService();
   final _picker = ImagePicker();
   
-  File? _profileImage;
+  XFile? _profileImage;
+  Uint8List? _profileImageBytes;
   bool _isLoading = false;
   bool _acceptTerms = false;
 
@@ -51,7 +52,13 @@ class _SignupScreenState extends State<SignupScreen> {
               onTap: () async {
                 Navigator.pop(context);
                 final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                if (picked != null) setState(() => _profileImage = File(picked.path));
+                if (picked != null) {
+                  final bytes = await picked.readAsBytes();
+                  setState(() {
+                    _profileImage = picked;
+                    _profileImageBytes = bytes;
+                  });
+                }
               },
             ),
             ListTile(
@@ -60,7 +67,13 @@ class _SignupScreenState extends State<SignupScreen> {
               onTap: () async {
                 Navigator.pop(context);
                 final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-                if (picked != null) setState(() => _profileImage = File(picked.path));
+                if (picked != null) {
+                  final bytes = await picked.readAsBytes();
+                  setState(() {
+                    _profileImage = picked;
+                    _profileImageBytes = bytes;
+                  });
+                }
               },
             ),
           ],
@@ -111,8 +124,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.white,
-                          backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
-                          child: _profileImage == null 
+                          backgroundImage: _profileImageBytes != null 
+                              ? MemoryImage(_profileImageBytes!) 
+                              : null,
+                          child: _profileImageBytes == null 
                             ? const Icon(Icons.add_a_photo, size: 40, color: AppColors.rose) 
                             : null,
                         ),
@@ -135,7 +150,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     validator: (v) => v!.isEmpty ? 'Nom de marque requis' : null,
                   ),
                   const SizedBox(height: 20),
-                  const Text("Type d'activité :", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text("Type d\u0027activité :", style: TextStyle(fontWeight: FontWeight.bold)),
                   Row(
                     children: [
                       _buildTypeChip('Couture'),
@@ -182,7 +197,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 CheckboxListTile(
                   value: _acceptTerms,
                   onChanged: (v) => setState(() => _acceptTerms = v!),
-                  title: const Text("J'accepte les conditions d'utilisation", style: TextStyle(fontSize: 12)),
+                  title: const Text("J\u0027accepte les conditions d\u0027utilisation", style: TextStyle(fontSize: 12)),
                   controlAffinity: ListTileControlAffinity.leading,
                   activeColor: AppColors.rose,
                   contentPadding: EdgeInsets.zero,

@@ -17,7 +17,22 @@ class AuthService {
     
     if (doc.exists) {
       return UserModel.fromMap(doc.data() as Map<String, dynamic>, user.uid);
+    } 
+    
+    // Cas spécial : Si c'est l'email admin mais que le document Firestore n'existe pas encore
+    if (user.email == 'cyrialesahamene@gmail.com') {
+      UserModel admin = UserModel(
+        uid: user.uid,
+        email: user.email!,
+        nom: "Admin",
+        prenom: "Principal",
+        role: UserRole.admin,
+        createdAt: DateTime.now(),
+      );
+      await _db.collection('users').doc(user.uid).set(admin.toMap());
+      return admin;
     }
+    
     return null;
   }
 
@@ -26,7 +41,7 @@ class AuthService {
     return _auth.authStateChanges().asyncMap(_userFromFirebase);
   }
 
-  // Inscription avec gestion d'erreur précise
+  // Inscription
   Future<String?> signUp({
     required String email,
     required String password,
@@ -53,6 +68,7 @@ class AuthService {
           role: role,
           createdAt: DateTime.now(),
           photoUrl: photoUrl,
+          verificationStatus: role == UserRole.prestataire ? VerificationStatus.enAttente : null,
         );
 
         Map<String, dynamic> userData = newUser.toMap();
@@ -62,26 +78,45 @@ class AuthService {
         }
 
         await _db.collection('users').doc(user.uid).set(userData);
-        return null; // Pas d'erreur
+        return null;
       }
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') return "Cet email est déjà utilisé.";
       if (e.code == 'weak-password') return "Le mot de passe est trop faible.";
-      if (e.code == 'invalid-email') return "L'adresse email n'est pas valide.";
-      return "Erreur : ${e.message}";
+      return e.message;
     } catch (e) {
-      return "Une erreur inconnue est survenue.";
+      return e.toString();
     }
-    return "Erreur lors de la création du compte.";
+    return "Erreur inconnue";
   }
 
   // Connexion
   Future<String?> signIn(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // Cas spécial Admin : Si le compte n'existe pas du tout en Auth, on le crée
+      if (email == 'cyrialesahamene@gmail.com' && password == '12345678') {
+        try {
+          await _auth.signInWithEmailAndPassword(email: email, password: password);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+            // Création automatique du compte admin s'il n'existe pas
+            await signUp(
+              email: email, 
+              password: password, 
+              nom: "Admin", 
+              prenom: "CamerMode", 
+              role: UserRole.admin
+            );
+            return null;
+          }
+          return e.message;
+        }
+      } else {
+        await _auth.signInWithEmailAndPassword(email: email, password: password);
+      }
       return null;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') return "Aucun utilisateur trouvé pour cet email.";
+      if (e.code == 'user-not-found') return "Utilisateur non trouvé.";
       if (e.code == 'wrong-password') return "Mot de passe incorrect.";
       return e.message;
     }

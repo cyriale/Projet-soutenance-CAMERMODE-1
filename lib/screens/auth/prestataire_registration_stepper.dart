@@ -1,5 +1,4 @@
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_colors.dart';
@@ -8,6 +7,7 @@ import '../../compronents/app_text_field.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/verification_service.dart';
+import 'package:flutter/foundation.dart';
 
 class PrestataireRegistrationStepper extends StatefulWidget {
   const PrestataireRegistrationStepper({super.key});
@@ -39,19 +39,21 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
   String _businessType = 'Couture';
   String _idType = 'CNI';
   bool _isWorkingAtHome = false;
-  File? _profileImage;
-  File? _idImage;
-  File? _proProofImage;
-  File? _shopImage;
-  File? _selfieImage;
+  
+  XFile? _profileImage;
+  XFile? _idImage;
+  XFile? _proProofImage;
+  XFile? _shopImage;
+  XFile? _selfieImage;
+
+  // Cache pour l'affichage des images sans dart:io
+  final Map<String, Uint8List> _imageBytes = {};
 
   @override
   void initState() {
     super.initState();
     if (_authService.currentUser != null) {
       _isUpgrade = true;
-      // On pré-remplit les infos du client si déjà connecté
-      // Note: Dans le vrai backend on chargerait l'objet user complet ici
       _nomController.text = "Utilisateur"; 
       _prenomController.text = "Client";
       _emailController.text = _authService.currentUser!.email ?? "";
@@ -74,7 +76,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
               onTap: () async {
                 Navigator.pop(context);
                 final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                if (picked != null) _setImage(type, picked.path);
+                if (picked != null) _setImage(type, picked);
               },
             ),
             ListTile(
@@ -83,7 +85,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
               onTap: () async {
                 Navigator.pop(context);
                 final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-                if (picked != null) _setImage(type, picked.path);
+                if (picked != null) _setImage(type, picked);
               },
             ),
           ],
@@ -92,13 +94,15 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
     );
   }
 
-  void _setImage(String type, String path) {
+  Future<void> _setImage(String type, XFile file) async {
+    final bytes = await file.readAsBytes();
     setState(() {
-      if (type == 'profile') _profileImage = File(path);
-      if (type == 'id') _idImage = File(path);
-      if (type == 'pro') _proProofImage = File(path);
-      if (type == 'shop') _shopImage = File(path);
-      if (type == 'selfie') _selfieImage = File(path);
+      _imageBytes[type] = bytes;
+      if (type == 'profile') _profileImage = file;
+      if (type == 'id') _idImage = file;
+      if (type == 'pro') _proProofImage = file;
+      if (type == 'shop') _shopImage = file;
+      if (type == 'selfie') _selfieImage = file;
     });
   }
 
@@ -198,12 +202,19 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         'role': 'prestataire',
       };
 
-      // Upload des fichiers
-      if (_profileImage != null) verificationData['photoUrl'] = await _verificationService.uploadDocument(userId: userId, file: _profileImage!, folderName: 'profile');
+      if (_profileImage != null) {
+        verificationData['photoUrl'] = await _verificationService.uploadDocument(userId: userId, file: _profileImage!, folderName: 'profile');
+      }
+      
       verificationData['idDocumentUrl'] = await _verificationService.uploadDocument(userId: userId, file: _idImage!, folderName: 'identity');
       verificationData['professionalProofUrl'] = await _verificationService.uploadDocument(userId: userId, file: _proProofImage!, folderName: 'professional');
-      if (!_isWorkingAtHome && _shopImage != null) verificationData['shopProofUrl'] = await _verificationService.uploadDocument(userId: userId, file: _shopImage!, folderName: 'shop');
-      if (_selfieImage != null) verificationData['selfieUrl'] = await _verificationService.uploadDocument(userId: userId, file: _selfieImage!, folderName: 'security');
+      
+      if (!_isWorkingAtHome && _shopImage != null) {
+        verificationData['shopProofUrl'] = await _verificationService.uploadDocument(userId: userId, file: _shopImage!, folderName: 'shop');
+      }
+      if (_selfieImage != null) {
+        verificationData['selfieUrl'] = await _verificationService.uploadDocument(userId: userId, file: _selfieImage!, folderName: 'security');
+      }
 
       await _verificationService.submitVerification(userId: userId, verificationData: verificationData);
 
@@ -285,8 +296,10 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
                 child: CircleAvatar(
                   radius: 50,
                   backgroundColor: Colors.white,
-                  backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
-                  child: _profileImage == null ? const Icon(Icons.add_a_photo, size: 40, color: AppColors.rose) : null,
+                  backgroundImage: _imageBytes['profile'] != null 
+                    ? MemoryImage(_imageBytes['profile']!) 
+                    : null,
+                  child: _imageBytes['profile'] == null ? const Icon(Icons.add_a_photo, size: 40, color: AppColors.rose) : null,
                 ),
               ),
               const SizedBox(height: 8),
@@ -358,7 +371,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         const Text("Une photo lisible de votre document officiel.", style: TextStyle(color: AppColors.texteSecondaire)),
         const SizedBox(height: 24),
         DropdownButtonFormField<String>(
-          value: _idType,
+          initialValue: _idType,
           items: ['CNI', 'Passeport', 'Permis'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
           onChanged: (v) => setState(() => _idType = v!),
           decoration: const InputDecoration(labelText: "Type de pièce", border: OutlineInputBorder()),
@@ -366,7 +379,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         const SizedBox(height: 16),
         AppTextField(controller: _idNumberController, labelText: "Numéro de la pièce", validator: (v) => v!.isEmpty ? "Requis" : null),
         const SizedBox(height: 24),
-        _buildImagePickerBox("Photo de la pièce d'identité", _idImage, () => _pickImage('id')),
+        _buildImagePickerBox("Photo de la pièce d'identité", 'id', () => _pickImage('id')),
       ],
     );
   }
@@ -379,13 +392,13 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         const SizedBox(height: 8),
         Text("Documents pour la catégorie $_businessType.", style: const TextStyle(color: AppColors.texteSecondaire)),
         const SizedBox(height: 24),
-        _buildImagePickerBox("Diplôme ou Attestation de formation", _proProofImage, () => _pickImage('pro')),
+        _buildImagePickerBox("Diplôme ou Attestation de formation", 'pro', () => _pickImage('pro')),
         if (!_isWorkingAtHome) ...[
           const SizedBox(height: 24),
-          _buildImagePickerBox("Photo de la boutique / atelier", _shopImage, () => _pickImage('shop')),
+          _buildImagePickerBox("Photo de la boutique / atelier", 'shop', () => _pickImage('shop')),
         ],
         const SizedBox(height: 24),
-        _buildImagePickerBox("Selfie de vérification", _selfieImage, () => _pickImage('selfie'), subtitle: "Prenez une photo de votre visage"),
+        _buildImagePickerBox("Selfie de vérification", 'selfie', () => _pickImage('selfie'), subtitle: "Prenez une photo de votre visage"),
       ],
     );
   }
@@ -416,10 +429,10 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         const SizedBox(height: 20),
         _buildSectionHeader("DOCUMENTS FOURNIS"),
         _buildSummaryRow("N° Pièce d'identité", _idNumberController.text),
-        _buildSummaryRow("Justificatif Pro", _proProofImage != null ? "✅ Reçu" : "❌ Manquant", isError: _proProofImage == null),
+        _buildSummaryRow("Justificatif Pro", _imageBytes['pro'] != null ? "✅ Reçu" : "❌ Manquant", isError: _imageBytes['pro'] == null),
         if (!_isWorkingAtHome)
-          _buildSummaryRow("Photo Boutique", _shopImage != null ? "✅ Reçu" : "❌ Manquant", isError: _shopImage == null),
-        _buildSummaryRow("Selfie Sécurité", _selfieImage != null ? "✅ Pris" : "❌ Manquant", isError: _selfieImage == null),
+          _buildSummaryRow("Photo Boutique", _imageBytes['shop'] != null ? "✅ Reçu" : "❌ Manquant", isError: _imageBytes['shop'] == null),
+        _buildSummaryRow("Selfie Sécurité", _imageBytes['selfie'] != null ? "✅ Pris" : "❌ Manquant", isError: _imageBytes['selfie'] == null),
 
         const SizedBox(height: 32),
         const Center(child: Text("Vos données sont protégées et seront vérifiées par l'admin.", style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.texteSecondaire), textAlign: TextAlign.center)),
@@ -432,7 +445,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      decoration: BoxDecoration(color: AppColors.noir.withOpacity(0.05), borderRadius: BorderRadius.circular(4)),
+      decoration: BoxDecoration(color: const Color(0x0D1C1C1C), borderRadius: BorderRadius.circular(4)),
       child: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.noir, letterSpacing: 1)),
     );
   }
@@ -450,7 +463,8 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
     );
   }
 
-  Widget _buildImagePickerBox(String title, File? image, VoidCallback onTap, {String? subtitle}) {
+  Widget _buildImagePickerBox(String title, String type, VoidCallback onTap, {String? subtitle}) {
+    final bytes = _imageBytes[type];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -463,8 +477,11 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
             height: 150,
             width: double.infinity,
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.ligne)),
-            child: image != null 
-              ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(image, fit: BoxFit.cover))
+            child: bytes != null 
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12), 
+                  child: Image.memory(bytes, fit: BoxFit.cover), 
+                )
               : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.camera_alt, size: 40, color: AppColors.rose), SizedBox(height: 8), Text("Cliquer pour ajouter")]),
           ),
         ),

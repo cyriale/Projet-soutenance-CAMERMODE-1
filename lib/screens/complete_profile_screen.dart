@@ -32,7 +32,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.noir, size: 20),
+          icon: const Icon(Icons.arrow_back, color: AppColors.noir),
           onPressed: () => Navigator.pop(context, false),
         ),
       ),

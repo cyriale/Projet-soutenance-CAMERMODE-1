@@ -1,4 +1,6 @@
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum UserRole { client, prestataire, admin }
 
 enum VerificationStatus {
@@ -20,33 +22,35 @@ class UserModel {
   final DateTime createdAt;
   final String? photoUrl;
 
-  // --- Profil Client ---
   final double? taille; 
   final double? poids;
   final double? tourPoitrine;
   final double? tourTaille;
   final double? tourHanche;
+  final double? largeurEpaules;
+  final double? longueurBras;
+  final double? longueurJambe;
+  final String? morphologieType; // Ex: "Sablier", "V", "H"
   final bool hasBodyScan;
   final String? typeCheveux;
   final String? formeVisage;
   final bool hasFaceScan;
 
-  // --- Profil Prestataire & Vérification ---
   final VerificationStatus? verificationStatus;
   final String? businessName;
-  final String? businessType; // 'Couture' or 'Coiffure'
+  final String? businessType;
   final String? adresseActivite;
   final DateTime? dateNaissance;
   
-  // Documents (URLs vers Firebase Storage)
   final String? idDocumentUrl;
-  final String? idDocumentType; // 'CNI', 'Passeport', etc.
+  final String? idDocumentType;
   final String? idDocumentNumber;
   final String? professionalProofUrl;
-  final String? shopProofUrl; // Photo boutique ou attestation
+  final String? shopProofUrl;
   final bool isWorkingAtHome;
   final String? selfieUrl;
   final String? rejectionReason;
+  final bool isBlocked;
 
   UserModel({
     required this.uid,
@@ -62,6 +66,10 @@ class UserModel {
     this.tourPoitrine,
     this.tourTaille,
     this.tourHanche,
+    this.largeurEpaules,
+    this.longueurBras,
+    this.longueurJambe,
+    this.morphologieType,
     this.hasBodyScan = false,
     this.typeCheveux,
     this.formeVisage,
@@ -79,25 +87,40 @@ class UserModel {
     this.isWorkingAtHome = false,
     this.selfieUrl,
     this.rejectionReason,
+    this.isBlocked = false,
   });
 
   bool isVerified() => role == UserRole.prestataire && verificationStatus == VerificationStatus.verifie;
 
+  String get roleLabel {
+    switch (role) {
+      case UserRole.admin: return "Administrateur";
+      case UserRole.prestataire: return "Prestataire";
+      case UserRole.client: return "Client";
+    }
+  }
+
+  bool get isAdmin => role == UserRole.admin;
+
   factory UserModel.fromMap(Map<String, dynamic> data, String id) {
     return UserModel(
       uid: id,
-      email: data['email'] ?? '',
-      nom: data['nom'] ?? '',
+      email: data['email'] ?? 'Sans email',
+      nom: data['nom'] ?? 'Nom inconnu',
       prenom: data['prenom'] ?? '',
       telephone: data['telephone'],
       photoUrl: data['photoUrl'],
       role: _parseRole(data['role']),
-      createdAt: (data['createdAt'] != null) ? (data['createdAt'] as dynamic).toDate() : DateTime.now(),
-      taille: data['taille']?.toDouble(),
-      poids: data['poids']?.toDouble(),
-      tourPoitrine: data['tourPoitrine']?.toDouble(),
-      tourTaille: data['tourTaille']?.toDouble(),
-      tourHanche: data['tourHanche']?.toDouble(),
+      createdAt: _parseDate(data['createdAt']),
+      taille: (data['taille'] as num?)?.toDouble(),
+      poids: (data['poids'] as num?)?.toDouble(),
+      tourPoitrine: (data['tourPoitrine'] as num?)?.toDouble(),
+      tourTaille: (data['tourTaille'] as num?)?.toDouble(),
+      tourHanche: (data['tourHanche'] as num?)?.toDouble(),
+      largeurEpaules: (data['largeurEpaules'] as num?)?.toDouble(),
+      longueurBras: (data['longueurBras'] as num?)?.toDouble(),
+      longueurJambe: (data['longueurJambe'] as num?)?.toDouble(),
+      morphologieType: data['morphologieType'],
       hasBodyScan: data['hasBodyScan'] ?? false,
       typeCheveux: data['typeCheveux'],
       formeVisage: data['formeVisage'],
@@ -106,7 +129,7 @@ class UserModel {
       businessName: data['businessName'],
       businessType: data['businessType'],
       adresseActivite: data['adresseActivite'],
-      dateNaissance: (data['dateNaissance'] != null) ? (data['dateNaissance'] as dynamic).toDate() : null,
+      dateNaissance: _parseDateNullable(data['dateNaissance']),
       idDocumentUrl: data['idDocumentUrl'],
       idDocumentType: data['idDocumentType'],
       idDocumentNumber: data['idDocumentNumber'],
@@ -115,21 +138,36 @@ class UserModel {
       isWorkingAtHome: data['isWorkingAtHome'] ?? false,
       selfieUrl: data['selfieUrl'],
       rejectionReason: data['rejectionReason'],
+      isBlocked: data['isBlocked'] ?? false,
     );
   }
 
-  static UserRole _parseRole(String? role) {
-    if (role == 'prestataire') return UserRole.prestataire;
-    if (role == 'admin') return UserRole.admin;
+  static UserRole _parseRole(dynamic role) {
+    if (role == 'prestataire' || role == 'UserRole.prestataire') return UserRole.prestataire;
+    if (role == 'admin' || role == 'UserRole.admin') return UserRole.admin;
     return UserRole.client;
   }
 
-  static VerificationStatus? _parseStatus(String? status) {
+  static VerificationStatus? _parseStatus(dynamic status) {
     if (status == null) return null;
+    final statusStr = status.toString().split('.').last;
     return VerificationStatus.values.firstWhere(
-      (e) => e.toString().split('.').last == status,
+      (e) => e.toString().split('.').last == statusStr,
       orElse: () => VerificationStatus.enAttente,
     );
+  }
+
+  static DateTime _parseDate(dynamic date) {
+    if (date is Timestamp) return date.toDate();
+    if (date is String) return DateTime.tryParse(date) ?? DateTime.now();
+    return DateTime.now();
+  }
+
+  static DateTime? _parseDateNullable(dynamic date) {
+    if (date == null) return null;
+    if (date is Timestamp) return date.toDate();
+    if (date is String) return DateTime.tryParse(date);
+    return null;
   }
 
   Map<String, dynamic> toMap() {
@@ -146,6 +184,10 @@ class UserModel {
       'tourPoitrine': tourPoitrine,
       'tourTaille': tourTaille,
       'tourHanche': tourHanche,
+      'largeurEpaules': largeurEpaules,
+      'longueurBras': longueurBras,
+      'longueurJambe': longueurJambe,
+      'morphologieType': morphologieType,
       'hasBodyScan': hasBodyScan,
       'typeCheveux': typeCheveux,
       'formeVisage': formeVisage,
@@ -163,6 +205,7 @@ class UserModel {
       'isWorkingAtHome': isWorkingAtHome,
       'selfieUrl': selfieUrl,
       'rejectionReason': rejectionReason,
+      'isBlocked': isBlocked,
     };
   }
 }

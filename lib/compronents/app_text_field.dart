@@ -14,6 +14,7 @@ class AppTextField extends StatelessWidget {
   final Function(String)? onChanged;
   final double? width;
   final double? height;
+  final int maxLines;
 
   const AppTextField({
     super.key,
@@ -28,6 +29,7 @@ class AppTextField extends StatelessWidget {
     this.onChanged,
     this.width,
     this.height,
+    this.maxLines = 1,
   });
 
   @override
@@ -41,6 +43,7 @@ class AppTextField extends StatelessWidget {
         keyboardType: keyboardType,
         validator: validator,
         onChanged: onChanged,
+        maxLines: maxLines,
         style: const TextStyle(color: AppColors.noir),
         decoration: InputDecoration(
           labelText: labelText,

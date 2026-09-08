@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'client/bottom_navigation_bar.dart';
 import 'prestataire/bottom_navigation_bar.dart';
+import 'admin/admin_main_screen.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
@@ -38,6 +39,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         if (user == null) {
           return const LoginScreen();
+        }
+
+        // Redirection Administrateur
+        if (user.role == UserRole.admin) {
+          return const AdminMainScreen();
         }
 
         // Logique de basculement pour le prestataire

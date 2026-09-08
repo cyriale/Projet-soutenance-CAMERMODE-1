@@ -2,11 +2,47 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/auth_wrapper.dart';
 import 'core/app_colors.dart';
+import 'services/auth_service.dart';
+import 'models/user_model.dart';
+import 'firebase_options.dart'; // Import important
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Démarre Firebase
+  
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint("✅ Firebase initialisé avec succès");
+    
+    // Tentative de création
+    await _setupAdminAccount();
+  } catch (e) {
+    debugPrint("❌ Erreur d'initialisation Firebase : $e");
+  }
+  
   runApp(const MyApp());
+}
+
+Future<void> _setupAdminAccount() async {
+  try {
+    final authService = AuthService();
+    final result = await authService.signUp(
+      email: 'cyrialesahamene@gmail.com',
+      password: '12345678',
+      nom: "Admin",
+      prenom: "CamerMode",
+      role: UserRole.admin,
+    );
+    
+    if (result == null) {
+      debugPrint("✅ Compte Admin créé ou déjà existant.");
+    } else {
+      debugPrint("ℹ️ Info Admin : $result");
+    }
+  } catch (e) {
+    debugPrint("⚠️ Erreur lors de la création de l'admin : $e");
+  }
 }
 
 class MyApp extends StatelessWidget {

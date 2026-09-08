@@ -112,6 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (_emailController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
                     setState(() => _isLoading = true);
                     
+                    final messenger = ScaffoldMessenger.of(context);
                     final user = await _authService.signIn(
                       _emailController.text.trim(),
                       _passwordController.text,
@@ -119,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     if (user == null && mounted) {
                       setState(() => _isLoading = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         const SnackBar(content: Text("Email ou mot de passe incorrect.")),
                       );
                     }
