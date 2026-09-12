@@ -1,12 +1,14 @@
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/app_colors.dart';
-import '../../services/dashboard_service.dart';
+import '../../models/chat_model.dart';
+import '../../services/chat_service.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final String conversationId;
-  final String prestataireNom;
-  final String prestatairePhoto;
+  final String pName;
+  final String pPhoto;
   final bool prestataireVerified;
   final String? articleRefTitre;
   final String? articleRefImageUrl;
@@ -14,8 +16,8 @@ class ChatConversationScreen extends StatefulWidget {
   const ChatConversationScreen({
     super.key,
     required this.conversationId,
-    required this.prestataireNom,
-    required this.prestatairePhoto,
+    required this.pName,
+    required this.pPhoto,
     this.prestataireVerified = true,
     this.articleRefTitre,
     this.articleRefImageUrl,
@@ -28,7 +30,8 @@ class ChatConversationScreen extends StatefulWidget {
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final DashboardService _service = DashboardService();
+  final ChatService _chatService = ChatService();
+  final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
 
   final List<String> _quickQuestions = [
     "Bonjour, cet article est-il disponible ?",
@@ -44,35 +47,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     super.dispose();
   }
 
-  void _sendMessage([String? quickText]) {
+  void _sendMessage([String? quickText]) async {
     final text = quickText ?? _textController.text.trim();
     if (text.isEmpty) return;
 
-    _service.sendMessage(
-      convId: widget.conversationId,
+    await _chatService.sendMessage(
+      conversationId: widget.conversationId,
+      senderId: _currentUserId,
       text: text,
       articleRefTitre: widget.articleRefTitre,
       articleRefImageUrl: widget.articleRefImageUrl,
     );
 
     _textController.clear();
-    setState(() {});
-
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final messages = _service.getMessagesForConv(widget.conversationId);
-
     return Scaffold(
       backgroundColor: AppColors.roseClair,
       appBar: AppBar(
@@ -86,8 +77,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: NetworkImage(widget.prestatairePhoto),
+              backgroundImage: widget.pPhoto.isNotEmpty ? NetworkImage(widget.pPhoto) : null,
               backgroundColor: Colors.grey[200],
+              child: widget.pPhoto.isEmpty ? const Icon(Icons.person) : null,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -98,7 +90,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          widget.prestataireNom,
+                          widget.pName,
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.noir),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -109,7 +101,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       ],
                     ],
                   ),
-                  const Text("En ligne récemment", style: TextStyle(fontSize: 11, color: AppColors.texteSecondaire)),
+                  const Text("En ligne", style: TextStyle(fontSize: 11, color: Colors.green)),
                 ],
               ),
             ),
@@ -118,7 +110,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       ),
       body: Column(
         children: [
-          // En-tête Article référencé
           if (widget.articleRefTitre != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -158,64 +149,68 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               ),
             ),
 
-          // Liste des messages
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final msg = messages[index];
-                final isMe = msg.isFromUser;
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    decoration: BoxDecoration(
-                      color: isMe ? AppColors.rose : Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 16),
+            child: StreamBuilder<List<ChatMessageModel>>(
+              stream: _chatService.getMessages(widget.conversationId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                final messages = snapshot.data ?? [];
+                
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = messages[index];
+                    final isMe = msg.senderId == _currentUserId;
+                    
+                    return Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                        decoration: BoxDecoration(
+                          color: isMe ? AppColors.rose : Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(16),
+                            topRight: const Radius.circular(16),
+                            bottomLeft: Radius.circular(isMe ? 16 : 4),
+                            bottomRight: Radius.circular(isMe ? 4 : 16),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              msg.text,
+                              style: TextStyle(
+                                color: isMe ? Colors.white : AppColors.noir,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}",
+                              style: TextStyle(
+                                color: isMe ? Colors.white70 : AppColors.texteSecondaire,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          msg.text,
-                          style: TextStyle(
-                            color: isMe ? Colors.white : AppColors.noir,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}",
-                          style: TextStyle(
-                            color: isMe ? Colors.white70 : AppColors.texteSecondaire,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             ),
           ),
 
-          // Suggestions de questions rapides
           Container(
             height: 38,
             margin: const EdgeInsets.only(bottom: 6),
@@ -235,7 +230,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
           ),
 
-          // Barre de saisie
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(

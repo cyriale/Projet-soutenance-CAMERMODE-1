@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
 import '../../services/dashboard_service.dart';
+import '../../services/chat_service.dart';
+import '../../services/auth_service.dart';
 import '../article_detail_screen.dart';
 import 'booking_dialog.dart';
 import 'chat_conversation_screen.dart';
@@ -220,23 +222,37 @@ class _PrestataireDetailScreenState extends State<PrestataireDetailScreen> with 
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () {
-                                  final convId = _service.getOrCreateConversation(
-                                    prestataireId: widget.prestataireId,
-                                    prestataireNom: widget.nom,
-                                    prestatairePhoto: widget.photoUrl,
-                                  );
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatConversationScreen(
-                                        conversationId: convId,
-                                        prestataireNom: widget.nom,
-                                        prestatairePhoto: widget.photoUrl,
-                                        prestataireVerified: widget.isVerified,
+                                onPressed: () async {
+                                  final chatService = ChatService();
+                                  final auth = AuthService();
+                                  final currentUser = await auth.onAuthStateChanged.first;
+
+                                  if (currentUser != null) {
+                                    final String prestataireId = widget.prestataireId;
+                                    final String prestataireNom = widget.nom;
+                                    final String prestatairePhoto = widget.photoUrl;
+
+                                    final String convId = await chatService.getOrCreateConversation(
+                                      client: currentUser,
+                                      prestataireId: prestataireId,
+                                      prestataireNom: prestataireNom,
+                                      prestatairePhoto: prestatairePhoto,
+                                    );
+                                    
+                                    if (!context.mounted) return;
+                                    
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChatConversationScreen(
+                                          conversationId: convId,
+                                          pName: prestataireNom,
+                                          pPhoto: prestatairePhoto,
+                                          prestataireVerified: widget.isVerified,
+                                        ),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  }
                                 },
                                 icon: const Icon(Icons.chat_bubble_outline, color: AppColors.noir, size: 18),
                                 label: const Text("Contacter", style: TextStyle(color: AppColors.noir, fontWeight: FontWeight.bold)),

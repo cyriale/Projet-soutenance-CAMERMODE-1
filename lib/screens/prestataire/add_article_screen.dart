@@ -1,5 +1,5 @@
 
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -26,6 +26,16 @@ class _AddArticleScreenState extends State<AddArticleScreen> {
   
   ArticleType _type = ArticleType.couture;
   String _categorie = "Robes de Soirée";
+  Uint8List? _imageBytes;
+
+  @override
+  void dispose() {
+    _titreController.dispose();
+    _descriptionController.dispose();
+    _prixController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,12 +69,10 @@ class _AddArticleScreenState extends State<AddArticleScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: AppColors.ligne),
                           ),
-                          child: viewModel.imageFile != null
+                          child: _imageBytes != null
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
-                                  child: kIsWeb 
-                                    ? Image.network(viewModel.imageFile!.path, fit: BoxFit.cover)
-                                    : Image.file(File(viewModel.imageFile!.path), fit: BoxFit.cover),
+                                  child: Image.memory(_imageBytes!, fit: BoxFit.cover),
                                 )
                               : const Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -137,6 +145,9 @@ class _AddArticleScreenState extends State<AddArticleScreen> {
                       isLoading: viewModel.isLoading,
                       onPressed: () async {
                         if (_formKey.currentState!.validate() && viewModel.imageFile != null) {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final navigator = Navigator.of(context);
+
                           final tags = _tagsController.text.split(',').map((e) => e.trim()).toList();
                           final success = await viewModel.submitArticle(
                             titre: _titreController.text,
@@ -147,11 +158,12 @@ class _AddArticleScreenState extends State<AddArticleScreen> {
                             tags: tags,
                           );
 
-                          if (success && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                          if (!mounted) return;
+                          if (success) {
+                            messenger.showSnackBar(
                               const SnackBar(content: Text("Création publiée !"), backgroundColor: Colors.green),
                             );
-                            Navigator.pop(context);
+                            navigator.pop();
                           }
                         } else if (viewModel.imageFile == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -180,17 +192,25 @@ class _AddArticleScreenState extends State<AddArticleScreen> {
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Appareil photo'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                viewModel.pickImage(ImageSource.camera);
+                await viewModel.pickImage(ImageSource.camera);
+                if (viewModel.imageFile != null) {
+                  final bytes = await viewModel.imageFile!.readAsBytes();
+                  setState(() => _imageBytes = bytes);
+                }
               },
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Galerie'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                viewModel.pickImage(ImageSource.gallery);
+                await viewModel.pickImage(ImageSource.gallery);
+                if (viewModel.imageFile != null) {
+                  final bytes = await viewModel.imageFile!.readAsBytes();
+                  setState(() => _imageBytes = bytes);
+                }
               },
             ),
           ],

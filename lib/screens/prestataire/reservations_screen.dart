@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/app_colors.dart';
 import '../../models/reservation_model.dart';
 import '../../services/reservation_service.dart';
@@ -64,7 +65,18 @@ class _PrestataireReservationsScreenState extends State<PrestataireReservationsS
                       ),
                       const SizedBox(height: 8),
                       Text("Date : ${res.date.day}/${res.date.month}/${res.date.year} à ${res.heure}"),
-                      Text("Lieu : ${res.lieuType == LieuPrestation.aDomicile ? 'À domicile (${res.adresseClient})' : 'Au salon'}"),
+                      Row(
+                        children: [
+                          Expanded(child: Text("Lieu : ${res.lieuType == LieuPrestation.aDomicile ? 'À domicile (${res.adresseClient})' : 'Au salon'}")),
+                          if (res.clientLatitude != null && res.clientLongitude != null)
+                            TextButton.icon(
+                              onPressed: () => _showClientOnMap(context, res),
+                              icon: const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                              label: const Text("Voir GPS", style: TextStyle(fontSize: 12, color: Colors.blue)),
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                            ),
+                        ],
+                      ),
                       if (res.attachedMeasurements != null) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -167,5 +179,32 @@ class _PrestataireReservationsScreenState extends State<PrestataireReservationsS
 
   Widget _measureText(String label, double? value) {
     return Text("$label: ${value?.toStringAsFixed(1)}cm", style: const TextStyle(fontSize: 12));
+  }
+
+  void _showClientOnMap(BuildContext context, ReservationModel res) {
+    if (res.clientLatitude == null || res.clientLongitude == null) return;
+    final position = LatLng(res.clientLatitude!, res.clientLongitude!);
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            width: 500,
+            height: 400,
+            child: Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(target: position, zoom: 15),
+                  markers: {Marker(markerId: const MarkerId("client"), position: position, infoWindow: InfoWindow(title: "Position du client"))},
+                ),
+                Positioned(top: 10, right: 10, child: CircleAvatar(backgroundColor: Colors.white, child: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -7,6 +7,7 @@ import '../core/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/verification_service.dart';
 import '../models/user_model.dart';
+import '../services/permission_service.dart';
 import 'package:flutter/foundation.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String _businessType = 'Couture';
   final AuthService _authService = AuthService();
   final VerificationService _verificationService = VerificationService();
+  final PermissionService _permissionService = PermissionService();
   final _picker = ImagePicker();
   
   XFile? _profileImage;
@@ -39,7 +41,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _pickImage() async {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
+      builder: (modalCtx) => Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -48,11 +50,19 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 20),
             ListTile(
               leading: const Icon(Icons.camera_alt, color: AppColors.rose),
-              title: const Text("Prendre une photo"),
+              title: const Text("Prendre une photo (Caméra)"),
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(modalCtx);
+                final hasPermission = await _permissionService.requestCameraPermission();
+                if (!mounted) return;
+                if (!hasPermission) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Permission caméra refusée")),
+                  );
+                  return;
+                }
                 final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                if (picked != null) {
+                if (picked != null && mounted) {
                   final bytes = await picked.readAsBytes();
                   setState(() {
                     _profileImage = picked;
@@ -65,9 +75,17 @@ class _SignupScreenState extends State<SignupScreen> {
               leading: const Icon(Icons.photo_library, color: AppColors.rose),
               title: const Text("Choisir depuis la galerie"),
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(modalCtx);
+                final hasPermission = await _permissionService.requestPhotosPermission();
+                if (!mounted) return;
+                if (!hasPermission) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Permission galerie refusée")),
+                  );
+                  return;
+                }
                 final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-                if (picked != null) {
+                if (picked != null && mounted) {
                   final bytes = await picked.readAsBytes();
                   setState(() {
                     _profileImage = picked;

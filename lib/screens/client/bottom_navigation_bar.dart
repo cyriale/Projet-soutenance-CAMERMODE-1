@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
+import '../../models/user_model.dart';
 import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'favorites_screen.dart';
@@ -9,11 +10,13 @@ import 'messaging_screen.dart';
 import 'profile_screen.dart';
 
 class ClientMainScreen extends StatefulWidget {
+  final UserModel user;
   final bool isPrestataire;
   final VoidCallback? onSwitchBack;
 
   const ClientMainScreen({
     super.key, 
+    required this.user,
     this.isPrestataire = false, 
     this.onSwitchBack,
   });
@@ -40,6 +43,7 @@ class _ClientMainScreenState extends State<ClientMainScreen> {
       ReservationsScreen(onBack: _goToHome),
       MessagingScreen(onBack: _goToHome),
       ProfileScreen(
+        user: widget.user,
         isPrestataire: widget.isPrestataire,
         onSwitchBack: widget.onSwitchBack,
         onBack: _goToHome,

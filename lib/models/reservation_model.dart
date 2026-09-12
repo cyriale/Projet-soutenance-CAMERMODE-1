@@ -30,6 +30,8 @@ class ReservationModel {
   final double prixEstime;
   final bool hasReview;
   final Map<String, double>? attachedMeasurements;
+  final double? clientLatitude;
+  final double? clientLongitude;
 
   ReservationModel({
     required this.id,
@@ -49,6 +51,8 @@ class ReservationModel {
     this.prixEstime = 0.0,
     this.hasReview = false,
     this.attachedMeasurements,
+    this.clientLatitude,
+    this.clientLongitude,
   });
 
   String get statusLabel {
@@ -123,6 +127,8 @@ class ReservationModel {
       'prixEstime': prixEstime,
       'hasReview': hasReview,
       'attachedMeasurements': attachedMeasurements,
+      'clientLatitude': clientLatitude,
+      'clientLongitude': clientLongitude,
     };
   }
 
@@ -147,6 +153,8 @@ class ReservationModel {
       attachedMeasurements: map['attachedMeasurements'] != null 
           ? Map<String, double>.from(map['attachedMeasurements'].map((k, v) => MapEntry(k, (v as num).toDouble())))
           : null,
+      clientLatitude: (map['clientLatitude'] as num?)?.toDouble(),
+      clientLongitude: (map['clientLongitude'] as num?)?.toDouble(),
     );
   }
 

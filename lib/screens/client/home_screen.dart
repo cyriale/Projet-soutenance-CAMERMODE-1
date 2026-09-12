@@ -2,12 +2,18 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
+import '../../models/user_model.dart';
 import '../../services/article_service.dart';
 import '../../services/dashboard_service.dart';
+import '../../services/ai_recommendation_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/user_service.dart';
 import '../article_detail_screen.dart';
 import 'prestataire_detail_screen.dart';
 import 'share_sheet.dart';
 import 'virtual_try_on_screen.dart';
+import 'body_scan_screen.dart';
+import 'face_scan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +25,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final DashboardService _dashboardService = DashboardService();
   final ArticleService _articleService = ArticleService();
+  final AIRecommendationService _recommendationService = AIRecommendationService();
+  final UserService _userService = UserService();
+  final AuthService _authService = AuthService();
+
+  UserModel? _currentUser;
   String _selectedCategory = "Tous";
   String _activeTab = "Pour vous";
   final TextEditingController _searchController = TextEditingController();
@@ -43,6 +54,20 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final authUser = _authService.currentUser;
+    if (authUser != null) {
+      final u = await _userService.getUser(authUser.uid);
+      if (mounted) setState(() => _currentUser = u);
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -59,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final allArticles = snapshot.data ?? [];
         List<ArticleModel> filtered = _activeTab == "Pour vous" 
-            ? allArticles // Ici on pourrait appliquer la recommandation IA plus tard
+            ? _recommendationService.getPersonalizedFeed(allArticles, _currentUser)
             : allArticles;
 
         // Filtrage Catégorie
@@ -183,61 +208,124 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // Bannière Recommandation Morphologique Personnalisée (Section 16)
+                // Bannière Recommandation Morphologique & Faciale Personnalisée (IA)
                 SliverToBoxAdapter(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2C2523), Color(0xFF1C1C1C)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.rose.withOpacity(0.2),
-                            shape: BoxShape.circle,
+                  child: InkWell(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                           ),
-                          child: const Icon(Icons.auto_awesome, color: AppColors.rose, size: 26),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                "Recommandations adaptées",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                              Row(
+                                children: const [
+                                  Icon(Icons.auto_awesome, color: AppColors.rose, size: 24),
+                                  SizedBox(width: 10),
+                                  Text("Intelligence Artificielle CamerMode", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "Style : ${_dashboardService.userPreferences['styles']?.join(', ') ?? 'Afro-Chic'}",
-                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              const SizedBox(height: 8),
+                              const Text("Scannez votre silhouette ou votre visage pour obtenir des recommandations 100% personnalisées.", style: TextStyle(color: AppColors.texteSecondaire, fontSize: 13)),
+                              const SizedBox(height: 20),
+                              ListTile(
+                                leading: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(color: AppColors.rose.withOpacity(0.1), shape: BoxShape.circle),
+                                  child: const Icon(Icons.accessibility_new, color: AppColors.rose),
+                                ),
+                                title: const Text("Scan Morphologique Corporel 3D", style: TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(_currentUser?.morphologieType != null ? "Actuel : ${_currentUser!.morphologieType}" : "Mesurez votre silhouette pour la couture"),
+                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyScanScreen())).then((_) => _loadUser());
+                                },
                               ),
+                              const Divider(),
+                              ListTile(
+                                leading: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), shape: BoxShape.circle),
+                                  child: const Icon(Icons.face_retouching_natural, color: Colors.purple),
+                                ),
+                                title: const Text("Scan Visage & Morphologie Coiffure", style: TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(_currentUser?.formeVisage != null ? "Actuel : ${_currentUser!.formeVisage}" : "Détectez votre forme de visage pour vos coiffures"),
+                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FaceScanScreen())).then((_) => _loadUser());
+                                },
+                              ),
+                              const SizedBox(height: 12),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.rose,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            "SUR-MESURE",
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
-                          ),
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2C2523), Color(0xFF1C1C1C)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      ],
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.rose.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.auto_awesome, color: AppColors.rose, size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Recommandations IA adaptées",
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _currentUser?.morphologieType != null
+                                      ? "Morphologie : ${_currentUser!.morphologieType!}"
+                                      : "Cliquez ici pour scanner votre silhouette / visage",
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.rose,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              "SCANNER IA",
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -15,13 +15,10 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  // Pour permettre au prestataire de "voir" l'appli comme un client
   bool _forceClientMode = false;
 
   void _toggleMode() {
-    setState(() {
-      _forceClientMode = !_forceClientMode;
-    });
+    setState(() => _forceClientMode = !_forceClientMode);
   }
 
   @override
@@ -31,8 +28,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return StreamBuilder<UserModel?>(
       stream: authService.onAuthStateChanged,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.pink)));
         }
 
         UserModel? user = snapshot.data;
@@ -48,11 +45,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // Logique de basculement pour le prestataire
         if (user.role == UserRole.prestataire && !_forceClientMode) {
-          return PrestataireMainScreen(onSwitchMode: _toggleMode);
+          return PrestataireMainScreen(user: user, onSwitchMode: _toggleMode);
         } else {
-          // Les clients voient la vue client, 
-          // et les prestataires en "mode forcé" aussi.
           return ClientMainScreen(
+            user: user,
             isPrestataire: user.role == UserRole.prestataire,
             onSwitchBack: user.role == UserRole.prestataire ? _toggleMode : null,
           );

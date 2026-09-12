@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../services/measurement_service.dart';
 import '../../services/user_service.dart';
 import '../../services/auth_service.dart';
+import 'package:flutter/foundation.dart';
 
 class BodyScanViewModel extends ChangeNotifier {
   final MeasurementService _measurementService = MeasurementService();
@@ -31,6 +31,8 @@ class BodyScanViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   Future<void> initializeCamera() async {
+    if (kIsWeb) return; // Sécurité Web
+
     final cameras = await availableCameras();
     if (cameras.isEmpty) return;
 
@@ -52,6 +54,7 @@ class BodyScanViewModel extends ChangeNotifier {
   }
 
   Future<void> captureAndProcess(double userHeightCm) async {
+    if (kIsWeb) return; // Sécurité Web
     if (_cameraController == null || !_cameraController!.value.isInitialized || _isProcessing) return;
 
     _isProcessing = true;
@@ -59,23 +62,15 @@ class BodyScanViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Capturer l'image
       final image = await _cameraController!.takePicture();
       final inputImage = InputImage.fromFilePath(image.path);
-
-      // 2. Détecter la pose avec ML Kit
       final poses = await _poseDetector!.processImage(inputImage);
 
       if (poses.isNotEmpty) {
         final pose = poses.first;
-
-        // 3. Calculer les mesures via le service
         _lastMeasurements = _measurementService.calculateMeasurements(pose, userHeightCm);
-        
-        // 4. Déterminer la morphologie
         final shoulderWidth = _lastMeasurements!['largeurEpaules']!;
         final hipWidth = _lastMeasurements!['tourHanche']! / 2.5;
-        // Approximation de la taille pour la morphologie
         final waistWidth = hipWidth * 0.8; 
         
         _morphology = _measurementService.determineMorphology(shoulderWidth, hipWidth, waistWidth);

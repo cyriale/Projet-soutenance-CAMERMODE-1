@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
 import '../../models/reservation_model.dart';
 import '../../models/user_model.dart';
 import '../../services/reservation_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/location_service.dart';
 
 class BookingDialog extends StatefulWidget {
   final ArticleModel article;
@@ -34,6 +36,9 @@ class _BookingDialogState extends State<BookingDialog> {
   bool _isSubmitting = false;
   bool _attachMeasurements = false;
   UserModel? _userProfile;
+  Position? _clientPosition;
+  bool _isLocating = false;
+  final _locationService = LocationService();
 
   @override
   void initState() {
@@ -152,6 +157,8 @@ class _BookingDialogState extends State<BookingDialog> {
         'tourHanche': _userProfile?.tourHanche ?? 0,
         'largeurEpaules': _userProfile?.largeurEpaules ?? 0,
       } : null,
+      clientLatitude: _clientPosition?.latitude,
+      clientLongitude: _clientPosition?.longitude,
     );
 
     final success = await resService.createReservation(reservation);
@@ -422,9 +429,24 @@ class _BookingDialogState extends State<BookingDialog> {
                   filled: true,
                   fillColor: Colors.grey[50],
                   prefixIcon: const Icon(Icons.location_on, color: AppColors.rose),
+                  suffixIcon: IconButton(
+                    icon: _isLocating 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.my_location, color: _clientPosition != null ? Colors.green : AppColors.rose),
+                    onPressed: _captureClientLocation,
+                    tooltip: "Partager ma position GPS",
+                  ),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.ligne)),
                 ),
               ),
+              if (_clientPosition != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 12),
+                  child: Text(
+                    "✅ Position GPS capturée avec succès",
+                    style: TextStyle(color: Colors.green[700], fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
             ],
             const SizedBox(height: 16),
 
@@ -511,5 +533,24 @@ class _BookingDialogState extends State<BookingDialog> {
         ),
       ),
     );
+  }
+
+  Future<void> _captureClientLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      final pos = await _locationService.getCurrentLocation();
+      setState(() {
+        _clientPosition = pos;
+        if (pos != null) {
+          _addressController.text = "Position GPS partagée";
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      setState(() => _isLocating = false);
+    }
   }
 }

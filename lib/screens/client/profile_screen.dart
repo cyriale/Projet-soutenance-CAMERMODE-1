@@ -7,16 +7,22 @@ import 'become_prestataire_screen.dart';
 import 'favorites_screen.dart';
 import 'saved_images_screen.dart';
 import '../../models/article_model.dart';
+import '../common/edit_profile_screen.dart';
+import 'body_scan_screen.dart';
+import 'face_scan_screen.dart';
+import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/dashboard_service.dart';
 
 class ProfileScreen extends StatelessWidget {
+  final UserModel user;
   final bool isPrestataire;
   final VoidCallback? onSwitchBack;
   final VoidCallback? onBack;
   
   const ProfileScreen({
     super.key, 
+    required this.user,
     this.isPrestataire = false, 
     this.onSwitchBack,
     this.onBack,
@@ -123,9 +129,30 @@ class ProfileScreen extends StatelessWidget {
               _buildProfileItem(
                 Icons.straighten,
                 "Mensurations & Morphologie",
+                badge: user.morphologieType,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CompleteProfileScreen(type: ArticleType.couture)),
+                ),
+              ),
+              _buildProfileItem(
+                Icons.accessibility_new,
+                "Scan Morphologique Corporel (Caméra IA)",
+                badge: user.hasBodyScan ? "Fait ✅" : "À faire",
+                color: user.hasBodyScan ? Colors.green : AppColors.rose,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const BodyScanScreen()),
+                ),
+              ),
+              _buildProfileItem(
+                Icons.face_retouching_natural,
+                "Scan Visage & Forme Coiffure (IA Visage)",
+                badge: user.hasFaceScan ? "Fait ✅" : "À faire",
+                color: user.hasFaceScan ? Colors.green : Colors.purple,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const FaceScanScreen()),
                 ),
               ),
               _buildProfileItem(
@@ -219,14 +246,33 @@ class ProfileScreen extends StatelessWidget {
                 Icons.logout,
                 "Déconnexion",
                 color: AppColors.erreur,
-                onTap: () async {
-                  await authService.signOut();
-                },
+                onTap: () => _showLogoutDialog(context, authService),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Déconnexion"),
+        content: const Text("Êtes-vous sûr de vouloir quitter votre session ?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Annuler")),
+          ElevatedButton(
+            onPressed: () async {
+              await authService.signOut();
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.erreur),
+            child: const Text("Déconnexion", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -240,32 +286,54 @@ class ProfileScreen extends StatelessWidget {
               gradient: AppColors.primaryGradient,
               shape: BoxShape.circle,
             ),
-            child: const CircleAvatar(
+            child: CircleAvatar(
               radius: 46,
-              backgroundImage: NetworkImage(
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
-              ),
+              backgroundColor: Colors.white,
+              backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
+                  ? NetworkImage(user.photoUrl!)
+                  : null,
+              child: user.photoUrl == null || user.photoUrl!.isEmpty
+                  ? Text(
+                      user.nom[0].toUpperCase(),
+                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.rose),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            "Mercy Cyriale",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir),
+          Text(
+            "${user.prenom} ${user.nom}",
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir),
           ),
           const SizedBox(height: 2),
-          const Text(
-            "mercy@camermode.com",
-            style: TextStyle(color: AppColors.texteSecondaire, fontSize: 13),
+          Text(
+            user.email,
+            style: const TextStyle(color: AppColors.texteSecondaire, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user))
+            ),
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text("Modifier le profil", style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.rose,
+              side: const BorderSide(color: AppColors.rose),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
           ),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.rose.withOpacity(0.12),
+              color: AppColors.rose.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              "Morphologie : ${service.userPreferences['morphologie'] ?? 'Sablier (X)'}",
+              "Morphologie : ${user.morphologieType ?? 'Non définie'}",
               style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold, fontSize: 11),
             ),
           ),

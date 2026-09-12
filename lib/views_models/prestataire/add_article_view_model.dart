@@ -1,13 +1,16 @@
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/article_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/user_service.dart';
+import '../../services/permission_service.dart';
 import '../../models/article_model.dart';
 
 class AddArticleViewModel extends ChangeNotifier {
   final ArticleService _articleService = ArticleService();
   final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
+  final PermissionService _permissionService = PermissionService();
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -17,12 +20,23 @@ class AddArticleViewModel extends ChangeNotifier {
 
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> pickImage(ImageSource source) async {
-    final picked = await _picker.pickImage(source: source, imageQuality: 70);
+  Future<bool> pickImage(ImageSource source) async {
+    bool hasPermission = true;
+    if (source == ImageSource.camera) {
+      hasPermission = await _permissionService.requestCameraPermission();
+    } else {
+      hasPermission = await _permissionService.requestPhotosPermission();
+    }
+
+    if (!hasPermission) return false;
+
+    final picked = await _picker.pickImage(source: source, imageQuality: 75);
     if (picked != null) {
       _imageFile = picked;
       notifyListeners();
+      return true;
     }
+    return false;
   }
 
   Future<bool> submitArticle({
@@ -38,27 +52,41 @@ class AddArticleViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // Récupérer les infos du prestataire connecté
-    final currentUser = _authService.currentUser;
-    if (currentUser == null) return false;
+    try {
+      // Récupérer les infos du prestataire connecté
+      final currentUser = _authService.currentUser;
+      if (currentUser == null) return false;
 
-    // Simulation/Récupération du profil complet (pour le nom/photo du prestataire)
-    // Idéalement on passerait par le UserService pour avoir les vraies infos
-    final success = await _articleService.uploadArticle(
-      prestataireId: currentUser.uid,
-      prestataireNom: "Mon Atelier", // À dynamiser avec le vrai nom du profil
-      prestatairePhoto: "", // À dynamiser
-      imageFile: _imageFile!,
-      titre: titre,
-      description: description,
-      prix: prix,
-      type: type,
-      categorie: categorie,
-      tags: tags,
-    );
+      // Récupération dynamique du profil
+      final profile = await _userService.getUser(currentUser.uid);
+      final nomPrestataire = profile?.businessName != null && profile!.businessName!.isNotEmpty
+          ? profile.businessName!
+          : "${profile?.prenom ?? ''} ${profile?.nom ?? 'Atelier'}".trim();
+      final photoPrestataire = profile?.photoUrl ?? "";
 
-    _isLoading = false;
-    notifyListeners();
-    return success;
+      final success = await _articleService.uploadArticle(
+        prestataireId: currentUser.uid,
+        prestataireNom: nomPrestataire.isNotEmpty ? nomPrestataire : "Atelier CamerMode",
+        prestatairePhoto: photoPrestataire,
+        prestataireAdresse: profile?.adresseActivite ?? "Douala / Yaoundé",
+        prestationADomicile: profile?.isWorkingAtHome ?? true,
+        imageFile: _imageFile!,
+        titre: titre,
+        description: description,
+        prix: prix,
+        type: type,
+        categorie: categorie,
+        tags: tags,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      debugPrint("Erreur submitArticle: $e");
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 }

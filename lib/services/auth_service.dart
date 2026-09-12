@@ -1,6 +1,8 @@
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 import '../models/user_model.dart';
 
 class AuthService {
@@ -9,36 +11,43 @@ class AuthService {
 
   User? get currentUser => _auth.currentUser;
 
-  // Transformer un User Firebase en notre UserModel
-  Future<UserModel?> _userFromFirebase(User? user) async {
-    if (user == null) return null;
-    
-    DocumentSnapshot doc = await _db.collection('users').doc(user.uid).get();
-    
-    if (doc.exists) {
-      return UserModel.fromMap(doc.data() as Map<String, dynamic>, user.uid);
-    } 
-    
-    // Cas spécial : Si c'est l'email admin mais que le document Firestore n'existe pas encore
-    if (user.email == 'cyrialesahamene@gmail.com') {
+  // Écouter les changements de connexion ET de profil en temps réel
+  Stream<UserModel?> get onAuthStateChanged {
+    return _auth.authStateChanges().switchMap((user) {
+      if (user == null) return Stream.value(null);
+      
+      // On écoute le document Firestore en temps réel
+      return _db.collection('users').doc(user.uid).snapshots().asyncMap((doc) async {
+        if (doc.exists) {
+          return UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+        }
+        
+        // Si le document n'existe pas encore (ex: inscription en cours ou admin)
+        if (user.email == 'cyrialesahamene@gmail.com') {
+          await _createAdminRecord(user.uid, user.email!);
+          final adminDoc = await _db.collection('users').doc(user.uid).get();
+          return UserModel.fromMap(adminDoc.data() as Map<String, dynamic>, adminDoc.id);
+        }
+        
+        return null;
+      });
+    });
+  }
+
+  Future<void> _createAdminRecord(String uid, String email) async {
+    try {
       UserModel admin = UserModel(
-        uid: user.uid,
-        email: user.email!,
+        uid: uid,
+        email: email,
         nom: "Admin",
         prenom: "Principal",
         role: UserRole.admin,
         createdAt: DateTime.now(),
       );
-      await _db.collection('users').doc(user.uid).set(admin.toMap());
-      return admin;
+      await _db.collection('users').doc(uid).set(admin.toMap());
+    } catch (e) {
+      debugPrint("Erreur création admin : $e");
     }
-    
-    return null;
-  }
-
-  // Écouter les changements de connexion
-  Stream<UserModel?> get onAuthStateChanged {
-    return _auth.authStateChanges().asyncMap(_userFromFirebase);
   }
 
   // Inscription
@@ -93,13 +102,14 @@ class AuthService {
   // Connexion
   Future<String?> signIn(String email, String password) async {
     try {
-      // Cas spécial Admin : Si le compte n'existe pas du tout en Auth, on le crée
+      debugPrint("🔑 Tentative de connexion pour : $email");
+      
+      // Cas spécial Admin
       if (email == 'cyrialesahamene@gmail.com' && password == '12345678') {
         try {
           await _auth.signInWithEmailAndPassword(email: email, password: password);
         } on FirebaseAuthException catch (e) {
           if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
-            // Création automatique du compte admin s'il n'existe pas
             await signUp(
               email: email, 
               password: password, 
@@ -112,13 +122,42 @@ class AuthService {
           return e.message;
         }
       } else {
-        await _auth.signInWithEmailAndPassword(email: email, password: password);
+        if (kIsWeb) {
+          try {
+            await _auth.setPersistence(Persistence.LOCAL);
+          } catch (_) {}
+        }
+        await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
       }
       return null;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') return "Utilisateur non trouvé.";
+      debugPrint("❌ Erreur Auth: ${e.code}");
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') return "Identifiants incorrects.";
       if (e.code == 'wrong-password') return "Mot de passe incorrect.";
-      return e.message;
+      if (e.code == 'invalid-email') return "Format d'email invalide.";
+      if (e.code == 'network-request-failed') return "Erreur réseau. Vérifiez votre connexion internet.";
+      return e.message ?? "Erreur de connexion.";
+    } catch (e) {
+      return "Une erreur inattendue est survenue.";
+    }
+  }
+
+  // Réinitialisation de mot de passe (Mot de passe oublié)
+  Future<String?> sendPasswordResetEmail(String email) async {
+    try {
+      final cleanEmail = email.trim();
+      if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
+        return "Veuillez entrer une adresse email valide.";
+      }
+      await _auth.sendPasswordResetEmail(email: cleanEmail);
+      return null; // Succès
+    } on FirebaseAuthException catch (e) {
+      debugPrint("❌ Erreur Reset Password: ${e.code}");
+      if (e.code == 'user-not-found') return "Aucun compte associé à cette adresse e-mail.";
+      if (e.code == 'invalid-email') return "Adresse e-mail invalide.";
+      return e.message ?? "Impossible d'envoyer l'e-mail de réinitialisation.";
+    } catch (e) {
+      return "Erreur lors de l'envoi de l'e-mail.";
     }
   }
 
@@ -127,8 +166,8 @@ class AuthService {
     await _auth.signOut();
   }
 
-  // Mettre à jour le profil
+  // Mettre à jour le profil avec merge sécurisé
   Future<void> updateUserProfile(String uid, Map<String, dynamic> data) async {
-    await _db.collection('users').doc(uid).update(data);
+    await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
   }
 }

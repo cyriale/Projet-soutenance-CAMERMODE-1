@@ -7,10 +7,14 @@ import '../../compronents/app_text_field.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/verification_service.dart';
+import 'package:geolocator/geolocator.dart';
+import '../../services/location_service.dart';
+import '../../services/permission_service.dart';
 import 'package:flutter/foundation.dart';
 
 class PrestataireRegistrationStepper extends StatefulWidget {
-  const PrestataireRegistrationStepper({super.key});
+  final UserModel? existingUser;
+  const PrestataireRegistrationStepper({super.key, this.existingUser});
 
   @override
   State<PrestataireRegistrationStepper> createState() => _PrestataireRegistrationStepperState();
@@ -23,6 +27,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
   final _verificationService = VerificationService();
+  final _locationService = LocationService();
   final _picker = ImagePicker();
 
   // Data
@@ -39,6 +44,8 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
   String _businessType = 'Couture';
   String _idType = 'CNI';
   bool _isWorkingAtHome = false;
+  Position? _currentPosition;
+  bool _isLocating = false;
   
   XFile? _profileImage;
   XFile? _idImage;
@@ -52,7 +59,33 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
   @override
   void initState() {
     super.initState();
-    if (_authService.currentUser != null) {
+    if (widget.existingUser != null) {
+      _isUpgrade = true;
+      _nomController.text = widget.existingUser!.nom;
+      _prenomController.text = widget.existingUser!.prenom;
+      _emailController.text = widget.existingUser!.email;
+      _phoneController.text = widget.existingUser!.telephone ?? "";
+      _businessNameController.text = widget.existingUser!.businessName ?? "";
+      _addressController.text = widget.existingUser!.adresseActivite ?? "";
+      _idNumberController.text = widget.existingUser!.idDocumentNumber ?? "";
+      _businessType = widget.existingUser!.businessType ?? 'Couture';
+      _idType = widget.existingUser!.idDocumentType ?? 'CNI';
+      _isWorkingAtHome = widget.existingUser!.isWorkingAtHome;
+      if (widget.existingUser!.latitude != null && widget.existingUser!.longitude != null) {
+        _currentPosition = Position(
+          latitude: widget.existingUser!.latitude!,
+          longitude: widget.existingUser!.longitude!,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          heading: 0,
+          speed: 0,
+          speedAccuracy: 0,
+          altitudeAccuracy: 0,
+          headingAccuracy: 0,
+        );
+      }
+    } else if (_authService.currentUser != null) {
       _isUpgrade = true;
       _nomController.text = "Utilisateur"; 
       _prenomController.text = "Client";
@@ -75,8 +108,13 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
               title: const Text("Prendre une photo"),
               onTap: () async {
                 Navigator.pop(context);
-                final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                if (picked != null) _setImage(type, picked);
+                final hasPermission = await PermissionService().requestCameraPermission();
+                if (hasPermission) {
+                  final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                  if (picked != null) _setImage(type, picked);
+                } else {
+                  _showError("Permission caméra refusée");
+                }
               },
             ),
             ListTile(
@@ -187,6 +225,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
 
       if (userId == null) throw "Utilisateur introuvable";
 
+      // 1. Préparation des données de base
       Map<String, dynamic> verificationData = {
         'nom': _nomController.text.trim(),
         'prenom': _prenomController.text.trim(),
@@ -195,6 +234,8 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         'businessName': _businessNameController.text.trim(),
         'businessType': _businessType,
         'adresseActivite': _addressController.text.trim(),
+        'latitude': _currentPosition?.latitude,
+        'longitude': _currentPosition?.longitude,
         'idDocumentType': _idType,
         'idDocumentNumber': _idNumberController.text.trim(),
         'isWorkingAtHome': _isWorkingAtHome,
@@ -202,20 +243,33 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         'role': 'prestataire',
       };
 
+      // 2. Lancement de tous les uploads en PARALLÈLE pour gagner du temps
+      List<Future<void>> uploadTasks = [];
+
       if (_profileImage != null) {
-        verificationData['photoUrl'] = await _verificationService.uploadDocument(userId: userId, file: _profileImage!, folderName: 'profile');
+        uploadTasks.add(_verificationService.uploadDocument(userId: userId, file: _profileImage!, folderName: 'profile').then((url) => verificationData['photoUrl'] = url));
       }
       
-      verificationData['idDocumentUrl'] = await _verificationService.uploadDocument(userId: userId, file: _idImage!, folderName: 'identity');
-      verificationData['professionalProofUrl'] = await _verificationService.uploadDocument(userId: userId, file: _proProofImage!, folderName: 'professional');
+      if (_idImage != null) {
+        uploadTasks.add(_verificationService.uploadDocument(userId: userId, file: _idImage!, folderName: 'identity').then((url) => verificationData['idDocumentUrl'] = url));
+      }
+      
+      if (_proProofImage != null) {
+        uploadTasks.add(_verificationService.uploadDocument(userId: userId, file: _proProofImage!, folderName: 'professional').then((url) => verificationData['professionalProofUrl'] = url));
+      }
       
       if (!_isWorkingAtHome && _shopImage != null) {
-        verificationData['shopProofUrl'] = await _verificationService.uploadDocument(userId: userId, file: _shopImage!, folderName: 'shop');
+        uploadTasks.add(_verificationService.uploadDocument(userId: userId, file: _shopImage!, folderName: 'shop').then((url) => verificationData['shopProofUrl'] = url));
       }
+      
       if (_selfieImage != null) {
-        verificationData['selfieUrl'] = await _verificationService.uploadDocument(userId: userId, file: _selfieImage!, folderName: 'security');
+        uploadTasks.add(_verificationService.uploadDocument(userId: userId, file: _selfieImage!, folderName: 'security').then((url) => verificationData['selfieUrl'] = url));
       }
 
+      // Attendre que tous les uploads finissent en même temps
+      await Future.wait(uploadTasks);
+
+      // 3. Soumission finale à Firestore
       await _verificationService.submitVerification(userId: userId, verificationData: verificationData);
 
       if (mounted) {
@@ -351,6 +405,45 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         const SizedBox(height: 24),
         AppTextField(controller: _addressController, labelText: "Adresse ou Zone d'activité", validator: (v) => v!.isEmpty ? "Requis" : null),
         const SizedBox(height: 16),
+        
+        // Bouton de géolocalisation
+        InkWell(
+          onTap: _isLocating ? null : _captureLocation,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _currentPosition != null ? Colors.green.withValues(alpha: 0.1) : AppColors.rose.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _currentPosition != null ? Colors.green : AppColors.rose),
+            ),
+            child: Row(
+              children: [
+                Icon(_currentPosition != null ? Icons.location_on : Icons.my_location, color: _currentPosition != null ? Colors.green : AppColors.rose),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _currentPosition != null ? "Position capturée ✅" : "Capturer ma position GPS",
+                        style: TextStyle(fontWeight: FontWeight.bold, color: _currentPosition != null ? Colors.green : AppColors.rose),
+                      ),
+                      Text(
+                        _currentPosition != null 
+                          ? "Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}, Long: ${_currentPosition!.longitude.toStringAsFixed(4)}"
+                          : "Recommandé pour être trouvé par les clients proches",
+                        style: const TextStyle(fontSize: 12, color: AppColors.texteSecondaire),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isLocating) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.rose)),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
         CheckboxListTile(
           value: _isWorkingAtHome,
           onChanged: (v) => setState(() => _isWorkingAtHome = v!),
@@ -360,6 +453,18 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         ),
       ],
     );
+  }
+
+  Future<void> _captureLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      final pos = await _locationService.getCurrentLocation();
+      setState(() => _currentPosition = pos);
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      setState(() => _isLocating = false);
+    }
   }
 
   Widget _stepIdentity() {
@@ -424,6 +529,7 @@ class _PrestataireRegistrationStepperState extends State<PrestataireRegistration
         _buildSummaryRow("Marque", _businessNameController.text),
         _buildSummaryRow("Domaine", _businessType),
         _buildSummaryRow("Localisation", _addressController.text),
+        _buildSummaryRow("GPS", _currentPosition != null ? "Capturé ✅" : "Non capturé ❌", isError: _currentPosition == null),
         _buildSummaryRow("Mode", _isWorkingAtHome ? "À domicile" : "En boutique"),
 
         const SizedBox(height: 20),

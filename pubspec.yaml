@@ -45,6 +45,12 @@ dependencies:
   permission_handler: ^13.0.2
   google_mlkit_pose_detection: ^0.16.1
   google_mlkit_face_detection: ^0.15.1
+  rxdart: ^0.28.0
+  geolocator: ^14.0.3
+  google_maps_flutter: ^2.18.0
+  firebase_messaging: ^16.6.0
+  flutter_local_notifications: ^22.3.0
+  google_generative_ai: ^0.4.6
 
 dev_dependencies:
   flutter_test:

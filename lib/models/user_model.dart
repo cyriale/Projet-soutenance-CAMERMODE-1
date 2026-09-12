@@ -40,6 +40,8 @@ class UserModel {
   final String? businessName;
   final String? businessType;
   final String? adresseActivite;
+  final double? latitude;
+  final double? longitude;
   final DateTime? dateNaissance;
   
   final String? idDocumentUrl;
@@ -78,6 +80,8 @@ class UserModel {
     this.businessName,
     this.businessType,
     this.adresseActivite,
+    this.latitude,
+    this.longitude,
     this.dateNaissance,
     this.idDocumentUrl,
     this.idDocumentType,
@@ -91,6 +95,10 @@ class UserModel {
   });
 
   bool isVerified() => role == UserRole.prestataire && verificationStatus == VerificationStatus.verifie;
+  bool get isVerifiedUser => role == UserRole.prestataire && verificationStatus == VerificationStatus.verifie;
+  bool get isPendingVerification => role == UserRole.prestataire && (verificationStatus == null || verificationStatus == VerificationStatus.enAttente || verificationStatus == VerificationStatus.enCours);
+  bool get isCorrectionNeeded => role == UserRole.prestataire && verificationStatus == VerificationStatus.documentsACorriger;
+  bool get isRejected => role == UserRole.prestataire && verificationStatus == VerificationStatus.refuse;
 
   String get roleLabel {
     switch (role) {
@@ -129,6 +137,8 @@ class UserModel {
       businessName: data['businessName'],
       businessType: data['businessType'],
       adresseActivite: data['adresseActivite'],
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
       dateNaissance: _parseDateNullable(data['dateNaissance']),
       idDocumentUrl: data['idDocumentUrl'],
       idDocumentType: data['idDocumentType'],
@@ -143,8 +153,10 @@ class UserModel {
   }
 
   static UserRole _parseRole(dynamic role) {
-    if (role == 'prestataire' || role == 'UserRole.prestataire') return UserRole.prestataire;
-    if (role == 'admin' || role == 'UserRole.admin') return UserRole.admin;
+    if (role == null) return UserRole.client;
+    String roleStr = role.toString().toLowerCase();
+    if (roleStr.contains('prestataire')) return UserRole.prestataire;
+    if (roleStr.contains('admin')) return UserRole.admin;
     return UserRole.client;
   }
 
@@ -166,7 +178,21 @@ class UserModel {
   static DateTime? _parseDateNullable(dynamic date) {
     if (date == null) return null;
     if (date is Timestamp) return date.toDate();
-    if (date is String) return DateTime.tryParse(date);
+    if (date is String) {
+      DateTime? parsed = DateTime.tryParse(date);
+      if (parsed != null) return parsed;
+      // Format JJ/MM/AAAA ou JJ-MM-AAAA
+      final parts = date.split(RegExp(r'[/.-]'));
+      if (parts.length == 3) {
+        final d = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        final y = int.tryParse(parts[2]);
+        if (d != null && m != null && y != null) {
+          if (y > 1000) return DateTime(y, m, d);
+          if (d > 1000) return DateTime(d, m, y);
+        }
+      }
+    }
     return null;
   }
 
@@ -196,6 +222,8 @@ class UserModel {
       'businessName': businessName,
       'businessType': businessType,
       'adresseActivite': adresseActivite,
+      'latitude': latitude,
+      'longitude': longitude,
       'dateNaissance': dateNaissance,
       'idDocumentUrl': idDocumentUrl,
       'idDocumentType': idDocumentType,

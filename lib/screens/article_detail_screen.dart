@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../models/article_model.dart';
 import '../services/dashboard_service.dart';
+import '../services/chat_service.dart';
+import '../services/auth_service.dart';
 import 'client/booking_dialog.dart';
 import 'client/chat_conversation_screen.dart';
 import 'client/prestataire_detail_screen.dart';
@@ -419,21 +421,30 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 children: [
                   // Contacter
                   IconButton.filledTonal(
-                    onPressed: () {
-                      final convId = _service.getOrCreateConversation(
+                    onPressed: () async {
+                      final navigator = Navigator.of(context);
+                      final auth = AuthService();
+                      final chatService = ChatService();
+                      
+                      final currentUser = await auth.onAuthStateChanged.first;
+                      if (currentUser == null) return;
+
+                      final convId = await chatService.getOrCreateConversation(
+                        client: currentUser,
                         prestataireId: currentArticle.prestataireId,
                         prestataireNom: currentArticle.prestataireNom,
                         prestatairePhoto: currentArticle.prestatairePhoto,
                         articleRefTitre: currentArticle.titre,
                         articleRefImageUrl: currentArticle.imageUrl,
                       );
-                      Navigator.push(
-                        context,
+
+                      if (!mounted) return;
+                      navigator.push(
                         MaterialPageRoute(
                           builder: (context) => ChatConversationScreen(
                             conversationId: convId,
-                            prestataireNom: currentArticle.prestataireNom,
-                            prestatairePhoto: currentArticle.prestatairePhoto,
+                            pName: currentArticle.prestataireNom,
+                            pPhoto: currentArticle.prestatairePhoto,
                             prestataireVerified: currentArticle.prestataireVerified,
                             articleRefTitre: currentArticle.titre,
                             articleRefImageUrl: currentArticle.imageUrl,

@@ -4,6 +4,7 @@ import '../compronents/app_button.dart';
 import '../compronents/app_text_field.dart';
 import '../core/app_colors.dart';
 import '../models/article_model.dart';
+import 'client/body_scan_screen.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   final ArticleType type;
@@ -63,7 +64,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               const SizedBox(height: 16),
               AppTextField(controller: _tailleController, labelText: "Tour de taille (cm)", keyboardType: TextInputType.number),
               const SizedBox(height: 30),
-              AppButton(text: "LANCER LE SCAN CORPOREL", onPressed: () {}, backgroundColor: AppColors.noir),
+              AppButton(
+                text: "LANCER LE SCAN CORPOREL", 
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const BodyScanScreen()),
+                  );
+                }, 
+                backgroundColor: AppColors.noir
+              ),
             ] else ...[
               const Text("Votre type de cheveux", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.noir)),
               const SizedBox(height: 12),

@@ -2,11 +2,14 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../common/account_security_screen.dart';
+import '../common/edit_profile_screen.dart';
 import '../../services/auth_service.dart';
+import '../../models/user_model.dart';
 
 class PrestataireProfileScreen extends StatelessWidget {
+  final UserModel user;
   final VoidCallback? onSwitchMode;
-  const PrestataireProfileScreen({super.key, this.onSwitchMode});
+  const PrestataireProfileScreen({super.key, required this.user, this.onSwitchMode});
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +32,7 @@ class PrestataireProfileScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 20),
         children: [
-          _buildProfileHeader(),
+          _buildProfileHeader(context),
           const SizedBox(height: 30),
           _buildSectionTitle("MA VITRINE"),
           _buildProfileItem(Icons.business_center_outlined, "Informations professionnelles"),
@@ -45,30 +48,75 @@ class PrestataireProfileScreen extends StatelessWidget {
           }),
           
           const SizedBox(height: 20),
-          _buildProfileItem(Icons.logout, "Déconnexion", color: AppColors.erreur, onTap: () async {
-            await authService.signOut();
-          }),
+          _buildProfileItem(Icons.logout, "Déconnexion", color: AppColors.erreur, onTap: () => _showLogoutDialog(context, authService)),
         ],
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  void _showLogoutDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Déconnexion"),
+        content: const Text("Voulez-vous vraiment vous déconnecter de votre compte professionnel ?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Annuler")),
+          ElevatedButton(
+            onPressed: () async {
+              await authService.signOut();
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.erreur),
+            child: const Text("Déconnexion", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(BuildContext context) {
     return Center(
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(4),
             decoration: const BoxDecoration(color: AppColors.rose, shape: BoxShape.circle),
-            child: const CircleAvatar(
+            child: CircleAvatar(
               radius: 50,
               backgroundColor: Colors.white,
-              child: Icon(Icons.storefront, size: 50, color: AppColors.noir),
+              backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
+                  ? NetworkImage(user.photoUrl!)
+                  : null,
+              child: user.photoUrl == null || user.photoUrl!.isEmpty
+                  ? const Icon(Icons.storefront, size: 50, color: AppColors.noir)
+                  : null,
             ),
           ),
           const SizedBox(height: 16),
-          const Text("Ma Marque Mode", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir)),
-          const Text("Coiffure & Tresses", style: TextStyle(color: AppColors.texteSecondaire)),
+          Text(
+            user.businessName ?? "${user.prenom} ${user.nom}", 
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir)
+          ),
+          Text(
+            user.businessType ?? "Prestataire Mode", 
+            style: const TextStyle(color: AppColors.texteSecondaire)
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user))
+            ),
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text("Modifier les infos", style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.rose,
+              side: const BorderSide(color: AppColors.rose),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          ),
         ],
       ),
     );

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../services/admin_service.dart';
@@ -11,8 +10,30 @@ class AdminViewModel extends ChangeNotifier {
   List<UserModel> _allUsers = [];
   List<UserModel> get allUsers => _allUsers;
 
+  List<UserModel> get allPrestataires => _allUsers
+      .where((u) => u.role == UserRole.prestataire)
+      .toList();
+
   List<UserModel> get pendingPrestataires => _allUsers
-      .where((u) => u.role == UserRole.prestataire && u.verificationStatus == VerificationStatus.enAttente)
+      .where((u) => u.role == UserRole.prestataire && 
+             (u.verificationStatus == null ||
+              u.verificationStatus == VerificationStatus.enAttente || 
+              u.verificationStatus == VerificationStatus.enCours))
+      .toList();
+
+  List<UserModel> get correctionRequestedPrestataires => _allUsers
+      .where((u) => u.role == UserRole.prestataire && 
+              u.verificationStatus == VerificationStatus.documentsACorriger)
+      .toList();
+
+  List<UserModel> get verifiedPrestataires => _allUsers
+      .where((u) => u.role == UserRole.prestataire && 
+              u.verificationStatus == VerificationStatus.verifie)
+      .toList();
+
+  List<UserModel> get rejectedPrestataires => _allUsers
+      .where((u) => u.role == UserRole.prestataire && 
+              u.verificationStatus == VerificationStatus.refuse)
       .toList();
 
   Map<String, int> _stats = {};
@@ -52,6 +73,8 @@ class AdminViewModel extends ChangeNotifier {
 
   Future<void> verifyPrestataire(String uid, VerificationStatus status, {String? reason}) async {
     await _verificationService.updateStatus(uid, status, reason: reason);
+    fetchStats();
+    notifyListeners();
   }
 
   Future<void> sendAnnouncement(String title, String content) async {

@@ -42,11 +42,11 @@ class VerificationService {
     required Map<String, dynamic> verificationData,
   }) async {
     try {
-      await _db.collection('users').doc(userId).update({
+      await _db.collection('users').doc(userId).set({
         ...verificationData,
         'verificationStatus': 'enAttente',
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
       return true;
     } catch (e) {
       debugPrint("Erreur submitVerification: $e");
@@ -56,10 +56,17 @@ class VerificationService {
 
   // Mettre à jour le statut (pour l'admin)
   Future<void> updateStatus(String userId, VerificationStatus status, {String? reason}) async {
-    await _db.collection('users').doc(userId).update({
-      'verificationStatus': status.toString().split('.').last,
+    final statusStr = status.toString().split('.').last;
+    Map<String, dynamic> updateData = {
+      'verificationStatus': statusStr,
       'rejectionReason': reason,
-    });
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    // Si validé, on s'assure que le motif de rejet précédent est réinitialisé si non spécifié
+    if (status == VerificationStatus.verifie && reason == null) {
+      updateData['rejectionReason'] = null;
+    }
+    await _db.collection('users').doc(userId).set(updateData, SetOptions(merge: true));
   }
 
   // Obtenir le flux de demandes en attente (pour l'admin)
