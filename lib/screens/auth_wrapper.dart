@@ -16,9 +16,14 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _forceClientMode = false;
+  bool _isGuestMode = false;
 
   void _toggleMode() {
     setState(() => _forceClientMode = !_forceClientMode);
+  }
+
+  void _enterGuestMode() {
+    setState(() => _isGuestMode = true);
   }
 
   @override
@@ -34,12 +39,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         UserModel? user = snapshot.data;
 
-        if (user == null) {
-          return const LoginScreen();
+        // Si pas de compte ET pas en mode visiteur -> Page Login
+        if (user == null && !_isGuestMode) {
+          return LoginScreen(onContinueAsGuest: _enterGuestMode);
+        }
+
+        // Si mode visiteur (user est forcément null ici)
+        if (_isGuestMode && user == null) {
+          return ClientMainScreen(
+            user: null,
+            isPrestataire: false,
+            onExitGuestMode: () => setState(() => _isGuestMode = false),
+          );
         }
 
         // Redirection Administrateur
-        if (user.role == UserRole.admin) {
+        if (user!.role == UserRole.admin) {
           return const AdminMainScreen();
         }
 

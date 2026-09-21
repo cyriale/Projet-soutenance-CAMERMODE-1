@@ -1,10 +1,13 @@
-import '../models/article_model.dart';
 import '../models/user_model.dart';
+import '../models/article_model.dart';
+import 'ai_chat_service.dart';
 
 class AIRecommendationService {
   static final AIRecommendationService _instance = AIRecommendationService._internal();
   factory AIRecommendationService() => _instance;
   AIRecommendationService._internal();
+
+  final AIChatService _aiChatService = AIChatService();
 
   /// Générer un flux personnalisé "Pour vous" intelligent basé sur le profil de l'utilisateur
   List<ArticleModel> getPersonalizedFeed(List<ArticleModel> allArticles, UserModel? user) {
@@ -105,6 +108,27 @@ class AIRecommendationService {
       createdAt: DateTime.now(),
       formeVisage: faceShape,
     ));
+  }
+
+  /// Génère un conseil de styliste ultra-personnalisé via l'IA Gemini
+  Future<String> getPersonalizedStylistAdvice(UserModel user, List<ArticleModel> topArticles) async {
+    final String morphology = user.morphologieType ?? "non définie";
+    final String face = user.formeVisage ?? "non définie";
+    final String articlesList = topArticles.map((a) => "- ${a.titre} (${a.categorie})").join("\n");
+
+    final prompt = """
+      En tant qu'expert styliste pour CamerMode, donne un conseil court (2 phrases max) à ${user.prenom}.
+      Sa morphologie est $morphology et son visage est $face.
+      Voici les articles que j'ai sélectionnés pour elle/lui :
+      $articlesList
+      Explique-lui brièvement pourquoi ces choix correspondent à sa silhouette et son style.
+    """;
+
+    try {
+      return await _aiChatService.getAIResponse(prompt);
+    } catch (e) {
+      return getMorphologyAdvice(morphology); // Retour au texte classique en cas d'erreur
+    }
   }
 
   String getMorphologyAdvice(String morphology) {

@@ -3,13 +3,16 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Client pour l'API StockImg.
 /// Permet de stocker des images sur un serveur externe et d'obtenir une URL.
 class StockImgClient {
-  // CONFIGURATION : Remplacez par vos vraies infos
-  static const String _baseUrl = "https://stockimg.onrender.com"; 
-  static const String _apiKey = "7|C0k5uA7aU92Zp8q0v9X1b2c3d4e5f6g7h8i9j0"; // Exemple, à remplacer
+  // Récupération de la clé depuis le fichier .env
+  String get _apiKey => dotenv.env['STOCKIMG_API_KEY'] ?? "";
+  
+  // CONFIGURATION : UTILISEZ VOTRE URL EXACTE ICI
+  static const String _baseUrl = "https://storage.mrsergio.dev";
 
   Map<String, String> get _headers => {
     'Authorization': 'Bearer $_apiKey',
@@ -19,7 +22,13 @@ class StockImgClient {
   /// Envoie une image (XFile) et renvoie son URL publique.
   Future<String?> uploadXFile(XFile file) async {
     try {
-      debugPrint("🚀 [StockImg] Début de l'envoi du fichier...");
+      if (_apiKey.isEmpty) {
+        debugPrint("❌ [StockImg] ERREUR : La clé API est vide ! Vérifiez votre fichier .env");
+        return null;
+      }
+
+      debugPrint("🚀 [StockImg] Préparation de l'envoi...");
+      debugPrint("🔗 [StockImg] URL cible : $_baseUrl/api/v1/files");
       
       var request = http.MultipartRequest(
         'POST',
@@ -28,8 +37,10 @@ class StockImgClient {
 
       request.headers.addAll(_headers);
 
-      // Support Mobile et Web via les bytes
+      // Lecture sécurisée des bytes
       Uint8List bytes = await file.readAsBytes();
+      debugPrint("📊 [StockImg] Taille du fichier à envoyer : ${bytes.length} bytes");
+
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
@@ -38,23 +49,32 @@ class StockImgClient {
         ),
       );
 
-      debugPrint("📤 [StockImg] Envoi de la requête vers $_baseUrl...");
-      var streamedResponse = await request.send();
+      debugPrint("📤 [StockImg] Connexion au serveur en cours...");
+      
+      // Ajout d'un délai d'attente plus long pour Render (serveurs gratuits lents au démarrage)
+      var streamedResponse = await request.send().timeout(
+        const Duration(seconds: 45),
+        onTimeout: () => throw "Le serveur met trop de temps à répondre (TimeOut).",
+      );
+      
       var response = await http.Response.fromStream(streamedResponse);
 
-      debugPrint("📊 [StockImg] Statut réponse : ${response.statusCode}");
+      debugPrint("📊 [StockImg] Réponse reçue ! Code : ${response.statusCode}");
       
       if (response.statusCode == 201) {
         var data = jsonDecode(response.body);
         String url = data['data']['url'];
-        debugPrint("✅ [StockImg] Fichier uploadé avec succès : $url");
+        debugPrint("✅ [StockImg] SUCCÈS ! Image disponible ici : $url");
         return url;
       } else {
-        debugPrint("❌ [StockImg] Échec de l'upload (${response.statusCode}) : ${response.body}");
+        debugPrint("❌ [StockImg] ÉCHEC (Code ${response.statusCode}) : ${response.body}");
         return null;
       }
     } catch (e) {
-      debugPrint("❌ [StockImg] ERREUR critique : $e");
+      debugPrint("❌ [StockImg] ERREUR RÉSEAU : $e");
+      if (e.toString().contains("Failed to fetch")) {
+        debugPrint("💡 [Conseil] Vérifiez que l'URL $_baseUrl est accessible dans votre navigateur.");
+      }
       return null;
     }
   }

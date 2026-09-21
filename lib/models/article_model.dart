@@ -29,6 +29,7 @@ class ArticleModel {
   final bool isPrestation;
   final List<String> tags;
   final String? tryOnOverlayUrl;
+  final bool isPublished;
 
   ArticleModel({
     required this.id,
@@ -58,6 +59,7 @@ class ArticleModel {
     this.isPrestation = false,
     this.tags = const [],
     this.tryOnOverlayUrl,
+    this.isPublished = true,
   });
 
   ArticleModel copyWith({
@@ -88,6 +90,7 @@ class ArticleModel {
     bool? isPrestation,
     List<String>? tags,
     String? tryOnOverlayUrl,
+    bool? isPublished,
   }) {
     return ArticleModel(
       id: id ?? this.id,
@@ -117,6 +120,7 @@ class ArticleModel {
       isPrestation: isPrestation ?? this.isPrestation,
       tags: tags ?? this.tags,
       tryOnOverlayUrl: tryOnOverlayUrl ?? this.tryOnOverlayUrl,
+      isPublished: isPublished ?? this.isPublished,
     );
   }
 
@@ -146,6 +150,7 @@ class ArticleModel {
       'isPrestation': isPrestation,
       'tags': tags,
       'tryOnOverlayUrl': tryOnOverlayUrl,
+      'isPublished': isPublished,
     };
   }
 
@@ -164,7 +169,7 @@ class ArticleModel {
       titre: map['titre'] ?? '',
       description: map['description'] ?? '',
       prix: (map['prix'] as num?)?.toDouble() ?? 0.0,
-      imageUrl: map['imageUrl'] ?? '',
+      imageUrl: map['imageUrl'] ?? map['image_url'] ?? '', 
       galleryImages: List<String>.from(map['galleryImages'] ?? []),
       type: map['type'] == 'coiffure' ? ArticleType.coiffure : ArticleType.couture,
       categorie: map['categorie'] ?? 'Mode',
@@ -178,6 +183,7 @@ class ArticleModel {
       isPrestation: map['isPrestation'] ?? false,
       tags: List<String>.from(map['tags'] ?? []),
       tryOnOverlayUrl: map['tryOnOverlayUrl'],
+      isPublished: map['isPublished'] ?? true,
     );
   }
 }

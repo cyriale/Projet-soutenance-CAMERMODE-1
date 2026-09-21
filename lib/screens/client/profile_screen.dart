@@ -15,14 +15,14 @@ import '../../services/auth_service.dart';
 import '../../services/dashboard_service.dart';
 
 class ProfileScreen extends StatelessWidget {
-  final UserModel user;
+  final UserModel? user;
   final bool isPrestataire;
   final VoidCallback? onSwitchBack;
   final VoidCallback? onBack;
   
   const ProfileScreen({
     super.key, 
-    required this.user,
+    this.user,
     this.isPrestataire = false, 
     this.onSwitchBack,
     this.onBack,
@@ -129,7 +129,7 @@ class ProfileScreen extends StatelessWidget {
               _buildProfileItem(
                 Icons.straighten,
                 "Mensurations & Morphologie",
-                badge: user.morphologieType,
+                badge: user?.morphologieType,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CompleteProfileScreen(type: ArticleType.couture)),
@@ -138,8 +138,8 @@ class ProfileScreen extends StatelessWidget {
               _buildProfileItem(
                 Icons.accessibility_new,
                 "Scan Morphologique Corporel (Caméra IA)",
-                badge: user.hasBodyScan ? "Fait ✅" : "À faire",
-                color: user.hasBodyScan ? Colors.green : AppColors.rose,
+                badge: user?.hasBodyScan == true ? "Fait ✅" : "À faire",
+                color: user?.hasBodyScan == true ? Colors.green : AppColors.rose,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const BodyScanScreen()),
@@ -148,8 +148,8 @@ class ProfileScreen extends StatelessWidget {
               _buildProfileItem(
                 Icons.face_retouching_natural,
                 "Scan Visage & Forme Coiffure (IA Visage)",
-                badge: user.hasFaceScan ? "Fait ✅" : "À faire",
-                color: user.hasFaceScan ? Colors.green : Colors.purple,
+                badge: user?.hasFaceScan == true ? "Fait ✅" : "À faire",
+                color: user?.hasFaceScan == true ? Colors.green : Colors.purple,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const FaceScanScreen()),
@@ -277,6 +277,31 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProfileHeader(BuildContext context, DashboardService service) {
+    if (user == null) {
+      return Center(
+        child: Column(
+          children: [
+            const CircleAvatar(
+              radius: 46,
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person_outline, size: 48, color: AppColors.rose),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "Mode Visiteur",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Inscrivez-vous pour personnaliser votre expérience",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.texteSecondaire, fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Center(
       child: Column(
         children: [
@@ -289,12 +314,12 @@ class ProfileScreen extends StatelessWidget {
             child: CircleAvatar(
               radius: 46,
               backgroundColor: Colors.white,
-              backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
-                  ? NetworkImage(user.photoUrl!)
+              backgroundImage: user!.photoUrl != null && user!.photoUrl!.isNotEmpty
+                  ? NetworkImage(user!.photoUrl!)
                   : null,
-              child: user.photoUrl == null || user.photoUrl!.isEmpty
+              child: user!.photoUrl == null || user!.photoUrl!.isEmpty
                   ? Text(
-                      user.nom[0].toUpperCase(),
+                      user!.nom[0].toUpperCase(),
                       style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.rose),
                     )
                   : null,
@@ -302,19 +327,19 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            "${user.prenom} ${user.nom}",
+            "${user!.prenom} ${user!.nom}",
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir),
           ),
           const SizedBox(height: 2),
           Text(
-            user.email,
+            user!.email,
             style: const TextStyle(color: AppColors.texteSecondaire, fontSize: 13),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => Navigator.push(
               context, 
-              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user))
+              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user!))
             ),
             icon: const Icon(Icons.edit, size: 16),
             label: const Text("Modifier le profil", style: TextStyle(fontSize: 12)),
@@ -333,7 +358,7 @@ class ProfileScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              "Morphologie : ${user.morphologieType ?? 'Non définie'}",
+              "Morphologie : ${user!.morphologieType ?? 'Non définie'}",
               style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold, fontSize: 11),
             ),
           ),

@@ -86,8 +86,16 @@ class _BodyScanScreenState extends State<BodyScanScreen> {
           AppButton(
             text: "OUVRIR LA CAMÉRA",
             onPressed: () async {
-              await viewModel.initializeCamera();
-              setState(() => _currentStep = 1);
+              try {
+                await viewModel.initializeCamera();
+                setState(() => _currentStep = 1);
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -128,10 +136,18 @@ class _BodyScanScreenState extends State<BodyScanScreen> {
               const SizedBox(height: 20),
               GestureDetector(
                 onTap: viewModel.isLoading ? null : () async {
-                  final height = double.tryParse(_heightController.text) ?? 170.0;
-                  await viewModel.captureAndProcess(height);
-                  if (viewModel.isScanComplete) {
-                    setState(() => _currentStep = 2);
+                  try {
+                    final height = double.tryParse(_heightController.text) ?? 170.0;
+                    await viewModel.captureAndProcess(height);
+                    if (viewModel.isScanComplete) {
+                      setState(() => _currentStep = 2);
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                      );
+                    }
                   }
                 },
                 child: Container(

@@ -5,6 +5,8 @@ import '../common/account_security_screen.dart';
 import '../common/edit_profile_screen.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
+import 'add_article_screen.dart';
+import 'prestataire_articles_screen.dart';
 
 class PrestataireProfileScreen extends StatelessWidget {
   final UserModel user;
@@ -35,8 +37,17 @@ class PrestataireProfileScreen extends StatelessWidget {
           _buildProfileHeader(context),
           const SizedBox(height: 30),
           _buildSectionTitle("MA VITRINE"),
+          _buildProfileItem(
+            Icons.add_a_photo_outlined, 
+            "Ajouter une création",
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AddArticleScreen())),
+          ),
           _buildProfileItem(Icons.business_center_outlined, "Informations professionnelles"),
-          _buildProfileItem(Icons.inventory_2_outlined, "Gérer mes articles"),
+          _buildProfileItem(
+            Icons.inventory_2_outlined, 
+            "Gérer mes articles",
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PrestataireArticlesScreen())),
+          ),
           _buildProfileItem(Icons.calendar_today_outlined, "Gérer mes disponibilités"),
           _buildProfileItem(Icons.star_outline, "Consulter mes avis"),
           

@@ -1,14 +1,20 @@
-
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/client_ai_service.dart'; // Utilisation du nouveau backend client
+import '../../services/user_service.dart';
+import '../../models/user_model.dart';
 import '../article_detail_screen.dart';
 import 'booking_dialog.dart';
 import 'chat_conversation_screen.dart';
 
+/// ===========================================================================
+/// ÉCRAN DÉTAIL PRESTATAIRE (VUE CLIENT)
+/// Gère la vitrine d'un professionnel avec recommandations intelligentes.
+/// ===========================================================================
 class PrestataireDetailScreen extends StatefulWidget {
   final String prestataireId;
   final String nom;
@@ -40,11 +46,26 @@ class PrestataireDetailScreen extends StatefulWidget {
 class _PrestataireDetailScreenState extends State<PrestataireDetailScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final DashboardService _service = DashboardService();
+  final ClientAIService _clientBackend = ClientAIService(); // Nouveau Backend Client
+  final AuthService _auth = AuthService();
+  final UserService _userService = UserService();
+  
+  UserModel? _currentUser; // Stocke le profil du client connecté
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _loadUser(); // Charge les données du client pour l'IA
+  }
+
+  /// Charge le profil du client pour savoir quelle morphologie utiliser pour l'IA
+  Future<void> _loadUser() async {
+    final u = _auth.currentUser;
+    if (u != null) {
+      final profile = await _userService.getUser(u.uid);
+      if (mounted) setState(() => _currentUser = profile);
+    }
   }
 
   @override
@@ -67,52 +88,27 @@ class _PrestataireDetailScreenState extends State<PrestataireDetailScreen> with 
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
+                // --- 1. IMAGE DE COUVERTURE ---
                 SliverAppBar(
                   expandedHeight: 220,
                   pinned: true,
                   backgroundColor: AppColors.noir,
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.white70,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: AppColors.noir),
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
                   ),
                   actions: [
-                    CircleAvatar(
-                      backgroundColor: Colors.white70,
-                      child: IconButton(
-                        icon: Icon(
-                          isFav ? Icons.favorite : Icons.favorite_border,
-                          color: isFav ? AppColors.rose : AppColors.noir,
-                        ),
-                        onPressed: () => _service.toggleFavoritePrestataire(widget.prestataireId),
-                      ),
+                    IconButton(
+                      icon: Icon(isFav ? Icons.favorite : Icons.favorite_border, color: AppColors.rose),
+                      onPressed: () => _service.toggleFavoritePrestataire(widget.prestataireId),
                     ),
-                    const SizedBox(width: 8),
                   ],
                   flexibleSpace: FlexibleSpaceBar(
-                    background: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          widget.photoUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => Container(color: Colors.grey[800]),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.black26, Colors.black.withOpacity(0.8)],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    background: Image.network(widget.photoUrl, fit: BoxFit.cover),
                   ),
                 ),
+
+                // --- 2. INFOS PRESTATAIRE (Header + Boutons) ---
                 SliverToBoxAdapter(
                   child: Container(
                     color: Colors.white,
@@ -120,177 +116,15 @@ class _PrestataireDetailScreenState extends State<PrestataireDetailScreen> with 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundImage: NetworkImage(widget.photoUrl),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          widget.nom,
-                                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir),
-                                        ),
-                                      ),
-                                      if (widget.isVerified) ...[
-                                        const SizedBox(width: 6),
-                                        const Icon(Icons.verified, color: Colors.blue, size: 20),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.star, color: Colors.amber, size: 18),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        "${widget.rating} (${widget.avisCount} avis clients)",
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.location_on, color: AppColors.rose, size: 14),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        "${widget.adresse} • ${widget.distance}",
-                                        style: const TextStyle(color: AppColors.texteSecondaire, fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Badges de qualification
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            if (widget.isVerified)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.shield_outlined, color: Colors.blue, size: 14),
-                                    SizedBox(width: 4),
-                                    Text("Prestataire certifié CAMERMODE", style: TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            if (widget.offersHomeService)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.succes.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: AppColors.succes.withOpacity(0.3)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.home_repair_service, color: AppColors.succes, size: 14),
-                                    SizedBox(width: 4),
-                                    Text("Prestation à domicile disponible", style: TextStyle(color: AppColors.succes, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Boutons d'action principaux : Contacter & Réserver
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () async {
-                                  final chatService = ChatService();
-                                  final auth = AuthService();
-                                  final currentUser = await auth.onAuthStateChanged.first;
-
-                                  if (currentUser != null) {
-                                    final String prestataireId = widget.prestataireId;
-                                    final String prestataireNom = widget.nom;
-                                    final String prestatairePhoto = widget.photoUrl;
-
-                                    final String convId = await chatService.getOrCreateConversation(
-                                      client: currentUser,
-                                      prestataireId: prestataireId,
-                                      prestataireNom: prestataireNom,
-                                      prestatairePhoto: prestatairePhoto,
-                                    );
-                                    
-                                    if (!context.mounted) return;
-                                    
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ChatConversationScreen(
-                                          conversationId: convId,
-                                          pName: prestataireNom,
-                                          pPhoto: prestatairePhoto,
-                                          prestataireVerified: widget.isVerified,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.chat_bubble_outline, color: AppColors.noir, size: 18),
-                                label: const Text("Contacter", style: TextStyle(color: AppColors.noir, fontWeight: FontWeight.bold)),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  side: const BorderSide(color: AppColors.ligne),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  if (providerArticles.isNotEmpty) {
-                                    BookingDialog.show(context, providerArticles.first);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("Sélectionnez une création pour réserver.")),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.calendar_month, color: Colors.white, size: 18),
-                                label: const Text("Réserver", style: TextStyle(fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.rose,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildProfileHeader(),
+                        const SizedBox(height: 20),
+                        _buildActionButtons(providerArticles),
                       ],
                     ),
                   ),
                 ),
+
+                // --- 3. BARRE D'ONGLETS ---
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _SliverAppBarDelegate(
@@ -299,166 +133,25 @@ class _PrestataireDetailScreenState extends State<PrestataireDetailScreen> with 
                       labelColor: AppColors.rose,
                       unselectedLabelColor: AppColors.texteSecondaire,
                       indicatorColor: AppColors.rose,
-                      indicatorWeight: 3,
                       tabs: const [
                         Tab(text: "Créations"),
                         Tab(text: "Services"),
                         Tab(text: "Galerie"),
-                        Tab(text: "Avis vérifiés"),
+                        Tab(text: "Avis"),
                       ],
                     ),
                   ),
                 ),
               ];
             },
+            // --- 4. CONTENU DES ONGLETS ---
             body: TabBarView(
               controller: _tabController,
               children: [
-                // 1. Articles publiés
-                providerArticles.isEmpty
-                    ? const Center(child: Text("Aucune création publiée"))
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: 0.68,
-                        ),
-                        itemCount: providerArticles.length,
-                        itemBuilder: (context, index) {
-                          final art = providerArticles[index];
-                          return InkWell(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => ArticleDetailScreen(article: art)),
-                            ),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 3)),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                      child: Image.network(art.imageUrl, fit: BoxFit.cover, width: double.infinity),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(10),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(art.titre, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                        const SizedBox(height: 4),
-                                        Text("${art.prix.toInt()} FCFA", style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.w900, fontSize: 13)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                // 2. Services proposés
-                ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildServiceCard(context, "Confection sur-mesure", "Prise de mesures, coupe, essayage intermédiaire et finitions", "À partir de 35 000 FCFA", Icons.straighten, providerArticles.firstOrNull),
-                    _buildServiceCard(context, "Retouche & Ajustement", "Ajustements d'ourlets, cintrage et reprises de robes/vestes", "À partir de 10 000 FCFA", Icons.cut, providerArticles.firstOrNull),
-                    _buildServiceCard(context, "Stylisme & Conseil Mode", "Accompagnement personnalisé pour choix de tissus et modèles", "20 000 FCFA / séance", Icons.auto_awesome, providerArticles.firstOrNull),
-                  ],
-                ),
-
-                // 3. Galerie
-                GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: providerArticles.length * 2,
-                  itemBuilder: (context, index) {
-                    final art = providerArticles[index % providerArticles.length];
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(art.imageUrl, fit: BoxFit.cover),
-                    );
-                  },
-                ),
-
-                // 4. Avis Vérifiés
-                reviews.isEmpty
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: Text("Les avis clients apparaîtront dès la réalisation de prestations vérifiées."),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: reviews.length,
-                        itemBuilder: (context, index) {
-                          final r = reviews[index];
-                          return Card(
-                            elevation: 0,
-                            margin: const EdgeInsets.only(bottom: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: const BorderSide(color: AppColors.ligne),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: AppColors.roseClair,
-                                        child: Icon(Icons.person, color: AppColors.noir, size: 18),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Text(r.userNom, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                                const SizedBox(width: 6),
-                                                const Icon(Icons.verified, color: Colors.green, size: 14),
-                                                const SizedBox(width: 4),
-                                                const Text("Client vérifié", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-                                              ],
-                                            ),
-                                            Text(r.serviceTitre, style: const TextStyle(color: AppColors.texteSecondaire, fontSize: 11)),
-                                          ],
-                                        ),
-                                      ),
-                                      Row(
-                                        children: List.generate(5, (i) => Icon(Icons.star, color: Colors.amber, size: 14)),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(r.commentaire, style: const TextStyle(fontSize: 13, height: 1.4)),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                _buildCreationsTab(providerArticles),
+                _buildServicesTab(),
+                _buildGalleryTab(providerArticles),
+                _buildReviewsTab(reviews),
               ],
             ),
           ),
@@ -467,65 +160,210 @@ class _PrestataireDetailScreenState extends State<PrestataireDetailScreen> with 
     );
   }
 
-  Widget _buildServiceCard(BuildContext context, String titre, String desc, String tarif, IconData icon, ArticleModel? fallbackArticle) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.ligne),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(14),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.rose.withOpacity(0.12),
-          child: Icon(icon, color: AppColors.rose),
-        ),
-        title: Text(titre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(desc, style: const TextStyle(fontSize: 12, color: AppColors.texteSecondaire)),
-            const SizedBox(height: 6),
-            Text(tarif, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.rose, fontSize: 13)),
-          ],
-        ),
-        trailing: ElevatedButton(
-          onPressed: () {
-            if (fallbackArticle != null) {
-              BookingDialog.show(context, fallbackArticle);
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.noir,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  // --- WIDGET : EN-TÊTE DU PROFIL ---
+  Widget _buildProfileHeader() {
+    return Row(
+      children: [
+        CircleAvatar(radius: 35, backgroundImage: NetworkImage(widget.photoUrl)),
+        const SizedBox(width: 15),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(widget.nom, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  if (widget.isVerified) const Icon(Icons.verified, color: Colors.blue, size: 18),
+                ],
+              ),
+              Text("${widget.rating} ⭐ (${widget.avisCount} avis)"),
+              Text("📍 ${widget.adresse} • ${widget.distance}", style: const TextStyle(fontSize: 12, color: AppColors.texteSecondaire)),
+            ],
           ),
-          child: const Text("Réserver", style: TextStyle(fontSize: 12)),
+        ),
+      ],
+    );
+  }
+
+  // --- WIDGET : BOUTONS D'ACTION ---
+  Widget _buildActionButtons(List<ArticleModel> articles) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => _startChat(),
+            child: const Text("Contacter", style: TextStyle(color: AppColors.noir)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () => articles.isNotEmpty ? BookingDialog.show(context, articles.first) : null,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.rose),
+            child: const Text("Réserver", style: TextStyle(color: Colors.white)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- ONGLET 1 : CRÉATIONS (Avec Recommandation IA en haut) ---
+  Widget _buildCreationsTab(List<ArticleModel> articles) {
+    if (articles.isEmpty) return const Center(child: Text("Aucune création publiée"));
+
+    return ListView(
+      children: [
+        // --- SECTION IA : RECOMMANDATIONS PERSONNALISÉES ---
+        if (_currentUser != null && (_currentUser!.morphologieType != null || _currentUser!.formeVisage != null))
+          _buildAIRecommendationSection(articles),
+
+        // Grille de tous les articles
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Text("TOUTES LES CRÉATIONS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.texteSecondaire)),
+        ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 0.7),
+          itemCount: articles.length,
+          itemBuilder: (context, index) {
+            final art = articles[index];
+            return InkWell(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: art))),
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Column(
+                  children: [
+                    Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(12)), child: Image.network(art.imageUrl, fit: BoxFit.cover, width: double.infinity))),
+                    Padding(padding: const EdgeInsets.all(8.0), child: Text(art.titre, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold))),
+                    Text("${art.prix.toInt()} FCFA", style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // --- WIDGET : LA BANNIÈRE DE RECOMMANDATION IA ---
+  Widget _buildAIRecommendationSection(List<ArticleModel> articles) {
+    final topThree = _clientBackend.getPersonalizedRecommendations(articles, _currentUser!);
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.noir, borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_awesome, color: AppColors.rose, size: 20),
+              SizedBox(width: 8),
+              Text("RECOMMANDÉ PAR L'IA", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Appel au backend IA client pour le conseil du styliste
+          FutureBuilder<String>(
+            future: _clientBackend.getStylistNote(_currentUser!, topThree),
+            builder: (context, snapshot) {
+              return Text(
+                snapshot.data ?? "Analyse de votre style en cours...",
+                style: const TextStyle(color: Colors.white70, fontSize: 11, fontStyle: FontStyle.italic),
+              );
+            },
+          ),
+          const SizedBox(height: 15),
+          // Liste horizontale des 3 meilleurs articles
+          SizedBox(
+            height: 140,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: topThree.length,
+              itemBuilder: (context, i) => GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: topThree[i]))),
+                child: Container(
+                  width: 100,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), image: DecorationImage(image: NetworkImage(topThree[i].imageUrl), fit: BoxFit.cover)),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- ONGLET : SERVICES ---
+  Widget _buildServicesTab() {
+    return ListView(
+      padding: const EdgeInsets.all(15),
+      children: const [
+        ListTile(leading: Icon(Icons.cut, color: AppColors.rose), title: Text("Confection sur-mesure"), subtitle: Text("À partir de 35 000 FCFA")),
+        ListTile(leading: Icon(Icons.straighten, color: AppColors.rose), title: Text("Retouches & Ajustements"), subtitle: Text("À partir de 5 000 FCFA")),
+      ],
+    );
+  }
+
+  // --- ONGLET : GALERIE ---
+  Widget _buildGalleryTab(List<ArticleModel> articles) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(10),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 5, mainAxisSpacing: 5),
+      itemCount: articles.length,
+      itemBuilder: (context, index) => ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(articles[index].imageUrl, fit: BoxFit.cover)),
+    );
+  }
+
+  // --- ONGLET : AVIS ---
+  Widget _buildReviewsTab(List<dynamic> reviews) {
+    if (reviews.isEmpty) return const Center(child: Text("Aucun avis client."));
+    return ListView.builder(
+      padding: const EdgeInsets.all(15),
+      itemCount: reviews.length,
+      itemBuilder: (context, index) => Card(
+        margin: const EdgeInsets.only(bottom: 10),
+        child: ListTile(
+          title: Text(reviews[index].userNom, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(reviews[index].commentaire),
+          trailing: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star, color: Colors.amber, size: 14), Text("5/5")]),
         ),
       ),
     );
+  }
+
+  // --- FONCTION : CHAT ---
+  void _startChat() async {
+    final user = await _auth.onAuthStateChanged.first;
+    if (user != null) {
+      final convId = await ChatService().getOrCreateConversation(
+        client: user,
+        prestataireId: widget.prestataireId,
+        prestataireNom: widget.nom,
+        prestatairePhoto: widget.photoUrl,
+      );
+      if (!mounted) return;
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatConversationScreen(conversationId: convId, pName: widget.nom, pPhoto: widget.photoUrl, prestataireVerified: widget.isVerified)));
+    }
   }
 }
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   _SliverAppBarDelegate(this._tabBar);
   final TabBar _tabBar;
-
   @override
   double get minExtent => _tabBar.preferredSize.height;
   @override
   double get maxExtent => _tabBar.preferredSize.height;
-
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white,
-      child: _tabBar,
-    );
-  }
-
+  Widget build(context, shrinkOffset, overlapsContent) => Container(color: Colors.white, child: _tabBar);
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }

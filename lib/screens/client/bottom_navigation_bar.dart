@@ -10,15 +10,17 @@ import 'messaging_screen.dart';
 import 'profile_screen.dart';
 
 class ClientMainScreen extends StatefulWidget {
-  final UserModel user;
+  final UserModel? user;
   final bool isPrestataire;
   final VoidCallback? onSwitchBack;
+  final VoidCallback? onExitGuestMode;
 
   const ClientMainScreen({
     super.key, 
-    required this.user,
+    this.user,
     this.isPrestataire = false, 
     this.onSwitchBack,
+    this.onExitGuestMode,
   });
 
   @override
@@ -37,7 +39,7 @@ class _ClientMainScreenState extends State<ClientMainScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      const HomeScreen(),
+      HomeScreen(onExitGuestMode: widget.onExitGuestMode),
       ExploreScreen(onBack: _goToHome),
       FavoritesScreen(onBack: _goToHome),
       ReservationsScreen(onBack: _goToHome),
@@ -68,7 +70,16 @@ class _ClientMainScreenState extends State<ClientMainScreen> {
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
+          onTap: (index) {
+            // Si c'est un visiteur (user null) et qu'il clique ailleurs que sur Accueil ou Explorer
+            if (widget.user == null && index > 1) {
+              if (widget.onExitGuestMode != null) {
+                widget.onExitGuestMode!();
+              }
+              return;
+            }
+            setState(() => _selectedIndex = index);
+          },
           type: BottomNavigationBarType.fixed,
           selectedItemColor: AppColors.rose,
           unselectedItemColor: AppColors.texteSecondaire,

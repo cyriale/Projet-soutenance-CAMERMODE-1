@@ -5,10 +5,14 @@ import 'screens/auth_wrapper.dart';
 import 'core/app_colors.dart';
 import 'services/notification_service.dart';
 import 'firebase_options.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   // 1. Initialisation de base ultra-rapide
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Chargement des variables d'environnement
+  await dotenv.load(fileName: ".env");
   
   // 2. Initialisation Firebase
   await Firebase.initializeApp(

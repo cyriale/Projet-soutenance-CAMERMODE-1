@@ -6,7 +6,8 @@ import '../services/auth_service.dart';
 import 'auth/role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final VoidCallback? onContinueAsGuest;
+  const LoginScreen({super.key, this.onContinueAsGuest});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -307,6 +308,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // Continuer en tant que visiteur
+              if (widget.onContinueAsGuest != null)
+                Center(
+                  child: TextButton.icon(
+                    onPressed: widget.onContinueAsGuest,
+                    icon: const Icon(Icons.visibility_outlined, size: 18, color: AppColors.texteSecondaire),
+                    label: const Text(
+                      "Continuer en tant que visiteur",
+                      style: TextStyle(
+                        color: AppColors.texteSecondaire,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
             ],
           ),

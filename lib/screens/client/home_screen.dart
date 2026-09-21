@@ -16,7 +16,8 @@ import 'body_scan_screen.dart';
 import 'face_scan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onExitGuestMode;
+  const HomeScreen({super.key, this.onExitGuestMode});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -209,126 +210,128 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
 
                 // Bannière Recommandation Morphologique & Faciale Personnalisée (IA)
-                SliverToBoxAdapter(
-                  child: InkWell(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: const [
-                                  Icon(Icons.auto_awesome, color: AppColors.rose, size: 24),
-                                  SizedBox(width: 10),
-                                  Text("Intelligence Artificielle CamerMode", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              const Text("Scannez votre silhouette ou votre visage pour obtenir des recommandations 100% personnalisées.", style: TextStyle(color: AppColors.texteSecondaire, fontSize: 13)),
-                              const SizedBox(height: 20),
-                              ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(color: AppColors.rose.withOpacity(0.1), shape: BoxShape.circle),
-                                  child: const Icon(Icons.accessibility_new, color: AppColors.rose),
-                                ),
-                                title: const Text("Scan Morphologique Corporel 3D", style: TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(_currentUser?.morphologieType != null ? "Actuel : ${_currentUser!.morphologieType}" : "Mesurez votre silhouette pour la couture"),
-                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyScanScreen())).then((_) => _loadUser());
-                                },
-                              ),
-                              const Divider(),
-                              ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), shape: BoxShape.circle),
-                                  child: const Icon(Icons.face_retouching_natural, color: Colors.purple),
-                                ),
-                                title: const Text("Scan Visage & Morphologie Coiffure", style: TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(_currentUser?.formeVisage != null ? "Actuel : ${_currentUser!.formeVisage}" : "Détectez votre forme de visage pour vos coiffures"),
-                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FaceScanScreen())).then((_) => _loadUser());
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF2C2523), Color(0xFF1C1C1C)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.rose.withOpacity(0.2),
-                              shape: BoxShape.circle,
+                // On l'affiche uniquement si c'est un client (selon la demande utilisateur)
+                if (_currentUser?.role == UserRole.client)
+                  SliverToBoxAdapter(
+                    child: InkWell(
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                             ),
-                            child: const Icon(Icons.auto_awesome, color: AppColors.rose, size: 26),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
                             child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  "Recommandations IA adaptées",
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                Row(
+                                  children: const [
+                                    Icon(Icons.auto_awesome, color: AppColors.rose, size: 24),
+                                    SizedBox(width: 10),
+                                    Text("Intelligence Artificielle CamerMode", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                  ],
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _currentUser?.morphologieType != null
-                                      ? "Morphologie : ${_currentUser!.morphologieType!}"
-                                      : "Cliquez ici pour scanner votre silhouette / visage",
-                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                const SizedBox(height: 8),
+                                const Text("Scannez votre silhouette ou votre visage pour obtenir des recommandations 100% personnalisées.", style: TextStyle(color: AppColors.texteSecondaire, fontSize: 13)),
+                                const SizedBox(height: 20),
+                                ListTile(
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(color: AppColors.rose.withOpacity(0.1), shape: BoxShape.circle),
+                                    child: const Icon(Icons.accessibility_new, color: AppColors.rose),
+                                  ),
+                                  title: const Text("Scan Morphologique Corporel 3D", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text(_currentUser?.morphologieType != null ? "Actuel : ${_currentUser!.morphologieType}" : "Mesurez votre silhouette pour la couture"),
+                                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyScanScreen())).then((_) => _loadUser());
+                                  },
                                 ),
+                                const Divider(),
+                                ListTile(
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), shape: BoxShape.circle),
+                                    child: const Icon(Icons.face_retouching_natural, color: Colors.purple),
+                                  ),
+                                  title: const Text("Scan Visage & Morphologie Coiffure", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text(_currentUser?.formeVisage != null ? "Actuel : ${_currentUser!.formeVisage}" : "Détectez votre forme de visage pour vos coiffures"),
+                                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const FaceScanScreen())).then((_) => _loadUser());
+                                  },
+                                ),
+                                const SizedBox(height: 12),
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.rose,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              "SCANNER IA",
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
-                            ),
+                        );
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF2C2523), Color(0xFF1C1C1C)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.rose.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.auto_awesome, color: AppColors.rose, size: 26),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Recommandations IA adaptées",
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _currentUser?.morphologieType != null
+                                        ? "Morphologie : ${_currentUser!.morphologieType!}"
+                                        : "Cliquez ici pour scanner votre silhouette / visage",
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.rose,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                "SCANNER IA",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
 
                 // Filtres par Onglets (Pour vous, Tendances, Nouveautés...)
                 SliverToBoxAdapter(
@@ -455,6 +458,11 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 GestureDetector(
                   onTap: () {
+                    // Si c'est un visiteur (_currentUser est null), on redirige vers le login
+                    if (_currentUser == null) {
+                      _showGuestRestrictionDialog(context);
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => ArticleDetailScreen(article: article)),
@@ -467,10 +475,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.image, color: Colors.grey),
-                      ),
+                      // Forcer le rendu HTML pour éviter les erreurs CORS sur Web
+                      key: ValueKey(article.imageUrl),
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.broken_image, color: Colors.grey),
+                              Text("Image non trouvée", style: TextStyle(fontSize: 8, color: Colors.grey)),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -556,6 +574,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   right: 8,
                   child: InkWell(
                     onTap: () {
+                      if (_currentUser == null) {
+                        _redirectToLogin(context);
+                        return;
+                      }
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => VirtualTryOnScreen(article: article)),
@@ -569,9 +591,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.rose, width: 1),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(Icons.auto_awesome, color: AppColors.rose, size: 12),
                           SizedBox(width: 4),
                           Text("Essayer", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -593,6 +615,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Titre
                 InkWell(
                   onTap: () {
+                    if (_currentUser == null) {
+                      _redirectToLogin(context);
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => ArticleDetailScreen(article: article)),
@@ -617,6 +643,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Profil Prestataire cliquable avec Badge Vérifié (Section 1 & 7)
                 InkWell(
                   onTap: () {
+                    // Restriction visiteur également ici
+                    if (_currentUser == null) {
+                      _showGuestRestrictionDialog(context);
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -673,5 +704,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  void _showGuestRestrictionDialog(BuildContext context) {
+    _redirectToLogin(context);
+  }
+
+  void _redirectToLogin(BuildContext context) {
+    if (widget.onExitGuestMode != null) {
+      widget.onExitGuestMode!();
+    }
   }
 }

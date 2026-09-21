@@ -18,6 +18,11 @@ class AddArticleViewModel extends ChangeNotifier {
   XFile? _imageFile;
   XFile? get imageFile => _imageFile;
 
+  void setImageFile(XFile file) {
+    _imageFile = file;
+    notifyListeners();
+  }
+
   final ImagePicker _picker = ImagePicker();
 
   Future<bool> pickImage(ImageSource source) async {
@@ -30,7 +35,13 @@ class AddArticleViewModel extends ChangeNotifier {
 
     if (!hasPermission) return false;
 
-    final picked = await _picker.pickImage(source: source, imageQuality: 75);
+    // Optimisation de l'image dès la capture (vitesse d'upload multipliée par 3)
+    final picked = await _picker.pickImage(
+      source: source, 
+      imageQuality: 60, // Équilibre parfait qualité/poids
+      maxWidth: 1080,   // Pas besoin de plus pour un dashboard mobile
+      maxHeight: 1080,
+    );
     if (picked != null) {
       _imageFile = picked;
       notifyListeners();
@@ -46,6 +57,7 @@ class AddArticleViewModel extends ChangeNotifier {
     required ArticleType type,
     required String categorie,
     required List<String> tags,
+    bool isPublished = true,
   }) async {
     if (_imageFile == null) return false;
 
@@ -55,21 +67,26 @@ class AddArticleViewModel extends ChangeNotifier {
     try {
       // Récupérer les infos du prestataire connecté
       final currentUser = _authService.currentUser;
-      if (currentUser == null) return false;
+      if (currentUser == null) {
+        debugPrint("❌ Erreur : Aucun utilisateur connecté");
+        return false;
+      }
 
       // Récupération dynamique du profil
       final profile = await _userService.getUser(currentUser.uid);
-      final nomPrestataire = profile?.businessName != null && profile!.businessName!.isNotEmpty
+      final nomPrestataire = (profile?.businessName != null && profile!.businessName!.isNotEmpty)
           ? profile.businessName!
           : "${profile?.prenom ?? ''} ${profile?.nom ?? 'Atelier'}".trim();
       final photoPrestataire = profile?.photoUrl ?? "";
+
+      debugPrint("📦 Soumission de l'article par $nomPrestataire");
 
       final success = await _articleService.uploadArticle(
         prestataireId: currentUser.uid,
         prestataireNom: nomPrestataire.isNotEmpty ? nomPrestataire : "Atelier CamerMode",
         prestatairePhoto: photoPrestataire,
-        prestataireAdresse: profile?.adresseActivite ?? "Douala / Yaoundé",
-        prestationADomicile: profile?.isWorkingAtHome ?? true,
+        prestataireAdresse: profile?.adresseActivite,
+        prestationADomicile: profile?.isWorkingAtHome,
         imageFile: _imageFile!,
         titre: titre,
         description: description,
@@ -77,13 +94,61 @@ class AddArticleViewModel extends ChangeNotifier {
         type: type,
         categorie: categorie,
         tags: tags,
+        isPublished: isPublished,
+      );
+
+      if (success) {
+        debugPrint("✅ Article publié avec succès");
+      } else {
+        debugPrint("⚠️ Échec de la publication de l'article");
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      debugPrint("❌ Exception submitArticle: $e");
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateArticle({
+    required String articleId,
+    required String titre,
+    required String description,
+    required double prix,
+    required ArticleType type,
+    required String categorie,
+    required List<String> tags,
+    required bool isPublished,
+    required String currentImageUrl,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final currentUser = _authService.currentUser;
+      final success = await _articleService.updateArticle(
+        articleId: articleId,
+        titre: titre,
+        description: description,
+        prix: prix,
+        type: type,
+        categorie: categorie,
+        tags: tags,
+        isPublished: isPublished,
+        newImageFile: _imageFile,
+        currentImageUrl: currentImageUrl,
+        prestataireId: currentUser?.uid,
       );
 
       _isLoading = false;
       notifyListeners();
       return success;
     } catch (e) {
-      debugPrint("Erreur submitArticle: $e");
+      debugPrint("Erreur updateArticle: $e");
       _isLoading = false;
       notifyListeners();
       return false;

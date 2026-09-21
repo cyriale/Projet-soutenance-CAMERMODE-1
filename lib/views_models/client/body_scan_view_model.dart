@@ -33,23 +33,27 @@ class BodyScanViewModel extends ChangeNotifier {
   Future<void> initializeCamera() async {
     if (kIsWeb) return; // Sécurité Web
 
-    final cameras = await availableCameras();
-    if (cameras.isEmpty) return;
-
-    _cameraController = CameraController(
-      cameras[0],
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-
-    _poseDetector = PoseDetector(options: PoseDetectorOptions());
-
     try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        throw "Aucune caméra détectée sur cet appareil.";
+      }
+
+      _cameraController = CameraController(
+        cameras[0],
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg, // Plus rapide pour le traitement
+      );
+
+      _poseDetector = PoseDetector(options: PoseDetectorOptions());
+
       await _cameraController!.initialize();
       _isCameraInitialized = true;
       notifyListeners();
     } catch (e) {
       debugPrint("Erreur initialisation caméra: $e");
+      rethrow;
     }
   }
 
@@ -62,7 +66,12 @@ class BodyScanViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final image = await _cameraController!.takePicture();
+      // Ajout d'un timeout pour éviter que ça tourne à l'infini
+      final image = await _cameraController!.takePicture().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw "La caméra ne répond pas. Réessayez.",
+      );
+      
       final inputImage = InputImage.fromFilePath(image.path);
       final poses = await _poseDetector!.processImage(inputImage);
 
@@ -75,9 +84,12 @@ class BodyScanViewModel extends ChangeNotifier {
         
         _morphology = _measurementService.determineMorphology(shoulderWidth, hipWidth, waistWidth);
         _isScanComplete = true;
+      } else {
+        throw "Aucune silhouette détectée. Assurez-vous d'être bien visible dans le cadre.";
       }
     } catch (e) {
       debugPrint("Erreur pendant le scan: $e");
+      rethrow; // On rethrow pour que l'UI puisse afficher l'erreur
     } finally {
       _isProcessing = false;
       _isLoading = false;
