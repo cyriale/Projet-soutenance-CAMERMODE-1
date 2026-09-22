@@ -30,6 +30,11 @@ class AIChatService {
     }
   }
 
+  /// Alias pour getAIResponse (facilite l'utilisation dans les services)
+  Future<String> sendMessage(String prompt) async {
+    return await getAIResponse(prompt);
+  }
+
   /// Répondre intelligemment à l'utilisateur dans n'importe quel langage
   Future<String> getAIResponse(String userPrompt, {String? userMorphology, String? userFaceShape}) async {
     final cleanPrompt = userPrompt.trim();

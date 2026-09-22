@@ -347,13 +347,17 @@ class _LoginScreenState extends State<LoginScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.rose.withOpacity(0.3),
+                  color: AppColors.rose.withOpacity(0.2),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 40),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 100,
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.auto_awesome, color: Colors.white, size: 40),
+            ),
           ),
           const SizedBox(height: 14),
           const Text(

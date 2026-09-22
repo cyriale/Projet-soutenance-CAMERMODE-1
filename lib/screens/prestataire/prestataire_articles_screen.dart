@@ -235,24 +235,13 @@ class _PrestataireArticlesScreenState extends State<PrestataireArticlesScreen> {
                     width: 110,
                     height: 120,
                     color: Colors.grey[100],
-                    child: art.imageUrl.isNotEmpty && art.imageUrl.startsWith('http')
+                    child: art.imageUrl.isNotEmpty
                       ? Image.network(
                           art.imageUrl,
                           fit: BoxFit.cover,
-                          // Ajout d'un cache pour améliorer la vitesse
-                          cacheWidth: 300, 
                           errorBuilder: (context, error, stackTrace) {
-                            debugPrint("❌ [UI] Erreur fatale sur l'image : ${art.imageUrl}");
-                            return Container(
-                              color: Colors.grey[200],
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.broken_image, color: Colors.grey),
-                                  Text("Fichier corrompu", style: TextStyle(fontSize: 8, color: Colors.grey)),
-                                ],
-                              ),
-                            );
+                            debugPrint("❌ [UI] Erreur Image.network : ${art.imageUrl}");
+                            return const Center(child: Icon(Icons.broken_image, color: Colors.grey));
                           },
                         )
                       : const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../complete_profile_screen.dart';
 import '../common/account_security_screen.dart';
+import '../common/notification_settings_sheet.dart';
 import 'become_prestataire_screen.dart';
 import 'favorites_screen.dart';
 import 'saved_images_screen.dart';
@@ -203,6 +204,11 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
               // Section Sécurité & Confidentialité (Section 18)
               _buildSectionTitle("SÉCURITÉ & CONFIDENTIALITÉ"),
+              _buildProfileItem(
+                Icons.notifications_none,
+                "Notifications & Alertes",
+                onTap: () => NotificationSettingsSheet.show(context, isPrestataire: isPrestataire),
+              ),
               _buildProfileItem(
                 Icons.lock_outline,
                 "Compte et protection des données",

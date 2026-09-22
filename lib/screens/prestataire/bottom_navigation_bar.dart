@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/user_model.dart';
 import 'prestataire_home_screen.dart';
-import 'prestataire_explore_screen.dart';
 import 'reservations_screen.dart';
 import 'prestataire_messaging_screen.dart';
 import 'prestataire_profile_screen.dart';
@@ -25,12 +24,52 @@ class PrestataireMainScreen extends StatefulWidget {
 class _PrestataireMainScreenState extends State<PrestataireMainScreen> {
   int _selectedIndex = 0;
 
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+  }) {
+    final bool isSelected = _selectedIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedIndex = index),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isSelected ? activeIcon : icon,
+                color: isSelected ? AppColors.rose : AppColors.texteSecondaire,
+                size: 22,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isSelected ? AppColors.rose : AppColors.texteSecondaire,
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       PrestataireHomeScreen(user: widget.user),
       const PrestataireMessagingScreen(),
-      const SizedBox(), // Dummy pour le bouton central
+      const SizedBox(), // Dummy pour alignement de l'index central
       const PrestataireReservationsScreen(),
       PrestataireProfileScreen(user: widget.user, onSwitchMode: widget.onSwitchMode),
     ];
@@ -49,31 +88,45 @@ class _PrestataireMainScreenState extends State<PrestataireMainScreen> {
         },
         backgroundColor: AppColors.rose,
         elevation: 4,
-        child: const Icon(Icons.add, color: Colors.white, size: 30),
+        shape: const CircleBorder(),
+        tooltip: "Ajouter une création",
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
-        clipBehavior: Clip.antiAlias,
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) {
-            if (index == 2) return; // Ne rien faire pour l'index central dummy
-            setState(() => _selectedIndex = index);
-          },
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: AppColors.rose,
-          unselectedItemColor: const Color(0x991C1C1C),
-          showUnselectedLabels: true,
-          backgroundColor: Colors.white,
-          elevation: 0,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accueil'),
-            BottomNavigationBarItem(icon: Icon(Icons.chat_outlined), activeIcon: Icon(Icons.chat), label: 'Messages'),
-            BottomNavigationBarItem(icon: Icon(Icons.add, color: Colors.transparent), label: ''), 
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: 'RDV'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
+        color: Colors.white,
+        elevation: 8,
+        padding: EdgeInsets.zero,
+        height: 64,
+        child: Row(
+          children: [
+            _buildNavItem(
+              index: 0,
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home,
+              label: 'Accueil',
+            ),
+            _buildNavItem(
+              index: 1,
+              icon: Icons.chat_bubble_outline,
+              activeIcon: Icons.chat_bubble,
+              label: 'Messages',
+            ),
+            const SizedBox(width: 56), // Espace central réservé au FAB
+            _buildNavItem(
+              index: 3,
+              icon: Icons.calendar_month_outlined,
+              activeIcon: Icons.calendar_month,
+              label: 'RDV',
+            ),
+            _buildNavItem(
+              index: 4,
+              icon: Icons.person_outline,
+              activeIcon: Icons.person,
+              label: 'Profil',
+            ),
           ],
         ),
       ),

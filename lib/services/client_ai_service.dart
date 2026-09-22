@@ -21,4 +21,9 @@ class ClientAIService {
     
     return await _recoEngine.getPersonalizedStylistAdvice(client, selectedArticles);
   }
+
+  /// Pose une question directe au styliste IA
+  Future<String> askStylistAdvice(String prompt) async {
+    return await _geminiChat.getAIResponse(prompt);
+  }
 }

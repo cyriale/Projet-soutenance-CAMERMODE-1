@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'welcome_screen.dart';
 import 'client/bottom_navigation_bar.dart';
 import 'prestataire/bottom_navigation_bar.dart';
 import 'admin/admin_main_screen.dart';
@@ -17,6 +18,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _forceClientMode = false;
   bool _isGuestMode = false;
+  bool _hasSeenWelcome = false;
 
   void _toggleMode() {
     setState(() => _forceClientMode = !_forceClientMode);
@@ -38,6 +40,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         UserModel? user = snapshot.data;
+
+        // Si pas de compte et premier lancement -> Afficher la page de bienvenue
+        if (user == null && !_isGuestMode && !_hasSeenWelcome) {
+          return WelcomeScreen(
+            onStarted: () => setState(() => _hasSeenWelcome = true),
+          );
+        }
 
         // Si pas de compte ET pas en mode visiteur -> Page Login
         if (user == null && !_isGuestMode) {

@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../common/account_security_screen.dart';
 import '../common/edit_profile_screen.dart';
+import '../common/notification_settings_sheet.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import 'add_article_screen.dart';
 import 'prestataire_articles_screen.dart';
+import 'prestataire_disponibilites_screen.dart';
+import 'prestataire_business_info_screen.dart';
+import 'prestataire_reviews_screen.dart';
 
 class PrestataireProfileScreen extends StatelessWidget {
   final UserModel user;
@@ -42,18 +46,48 @@ class PrestataireProfileScreen extends StatelessWidget {
             "Ajouter une création",
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AddArticleScreen())),
           ),
-          _buildProfileItem(Icons.business_center_outlined, "Informations professionnelles"),
+          _buildProfileItem(
+            Icons.business_center_outlined, 
+            "Informations professionnelles",
+            onTap: () => Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (context) => PrestataireBusinessInfoScreen(user: user)),
+            ),
+          ),
           _buildProfileItem(
             Icons.inventory_2_outlined, 
             "Gérer mes articles",
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PrestataireArticlesScreen())),
           ),
-          _buildProfileItem(Icons.calendar_today_outlined, "Gérer mes disponibilités"),
-          _buildProfileItem(Icons.star_outline, "Consulter mes avis"),
+          _buildProfileItem(
+            Icons.calendar_today_outlined, 
+            "Gérer mes disponibilités",
+            onTap: () => Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (context) => PrestataireDisponibilitesScreen(prestataireId: user.uid)),
+            ),
+          ),
+          _buildProfileItem(
+            Icons.star_outline, 
+            "Consulter mes avis",
+            onTap: () => Navigator.push(
+              context, 
+              MaterialPageRoute(
+                builder: (context) => PrestataireReviewsScreen(
+                  prestataireId: user.uid,
+                  prestataireNom: user.businessName ?? "${user.prenom} ${user.nom}",
+                ),
+              ),
+            ),
+          ),
           
           const SizedBox(height: 20),
           _buildSectionTitle("PARAMÈTRES"),
-          _buildProfileItem(Icons.notifications_none, "Notifications"),
+          _buildProfileItem(
+            Icons.notifications_none, 
+            "Notifications",
+            onTap: () => NotificationSettingsSheet.show(context, isPrestataire: true),
+          ),
           _buildProfileItem(Icons.lock_outline, "Compte et sécurité", onTap: () {
             Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountSecurityScreen()));
           }),

@@ -5,7 +5,9 @@ import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
 import '../../models/reservation_model.dart';
 import '../../models/user_model.dart';
+import '../../models/availability_model.dart';
 import '../../services/reservation_service.dart';
+import '../../services/availability_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/location_service.dart';
 
@@ -29,7 +31,7 @@ class BookingDialog extends StatefulWidget {
 
 class _BookingDialogState extends State<BookingDialog> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  String _selectedTimeSlot = "10:00";
+  String _selectedTimeSlot = "";
   LieuPrestation _lieuType = LieuPrestation.auSalon;
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
@@ -39,11 +41,55 @@ class _BookingDialogState extends State<BookingDialog> {
   Position? _clientPosition;
   bool _isLocating = false;
   final _locationService = LocationService();
+  final _availabilityService = AvailabilityService();
+  AvailabilityModel? _providerAvailability;
+
+  List<String> _timeSlots = [];
 
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadProviderAvailability();
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case 1: return 'Lundi';
+      case 2: return 'Mardi';
+      case 3: return 'Mercredi';
+      case 4: return 'Jeudi';
+      case 5: return 'Vendredi';
+      case 6: return 'Samedi';
+      case 7: return 'Dimanche';
+      default: return '';
+    }
+  }
+
+  Future<void> _loadProviderAvailability() async {
+    final avail = await _availabilityService.getAvailability(widget.article.prestataireId);
+    if (mounted) {
+      setState(() {
+        _providerAvailability = avail;
+        _updateAvailableSlotsForDate(_selectedDate);
+      });
+    }
+  }
+
+  void _updateAvailableSlotsForDate(DateTime date) {
+    if (_providerAvailability == null) return;
+    
+    final dayName = _getDayName(date.weekday);
+    final slots = _providerAvailability!.daySlots[dayName] ?? [];
+    
+    setState(() {
+      _timeSlots = List.from(slots);
+      if (_timeSlots.isNotEmpty) {
+        _selectedTimeSlot = _timeSlots.first;
+      } else {
+        _selectedTimeSlot = "";
+      }
+    });
   }
 
   Future<void> _loadUserProfile() async {
@@ -54,7 +100,6 @@ class _BookingDialogState extends State<BookingDialog> {
       if (doc.exists) {
         setState(() {
           _userProfile = UserModel.fromMap(doc.data()!, user.uid);
-          // Si l'utilisateur a un scan, on active l'option par défaut pour la couture
           if (_userProfile!.hasBodyScan && widget.article.type == ArticleType.couture) {
             _attachMeasurements = true;
           }
@@ -62,15 +107,6 @@ class _BookingDialogState extends State<BookingDialog> {
       }
     }
   }
-
-  final List<String> _timeSlots = [
-    "09:00",
-    "10:30",
-    "12:00",
-    "14:00",
-    "15:30",
-    "17:00",
-  ];
 
   @override
   void dispose() {
@@ -100,19 +136,42 @@ class _BookingDialogState extends State<BookingDialog> {
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
+      _updateAvailableSlotsForDate(picked);
     }
   }
 
   void _confirmBooking() async {
+    if (_selectedTimeSlot.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez choisir un créneau horaire disponible.")),
+      );
+      return;
+    }
+
     final auth = AuthService();
     final userId = auth.currentUser?.uid;
     if (userId == null) return;
 
     setState(() => _isSubmitting = true);
 
+    if (_providerAvailability != null) {
+      final dayName = _getDayName(_selectedDate.weekday);
+      final isOpen = _providerAvailability!.workingDays[dayName] ?? true;
+      if (!isOpen) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("⚠️ Ce prestataire est fermé le $dayName. Veuillez choisir un jour d'ouverture."),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+    }
+
     final resService = ReservationService();
     
-    // Vérification de la disponibilité du créneau
     final isTaken = await resService.isSlotTaken(
       prestataireId: widget.article.prestataireId, 
       date: _selectedDate, 
@@ -124,9 +183,8 @@ class _BookingDialogState extends State<BookingDialog> {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("⚠️ Ce créneau est déjà réservé pour ce prestataire à cette date. Veuillez choisir une autre heure ou une autre date."),
+            content: Text("⚠️ Ce créneau est déjà réservé. Veuillez en choisir un autre."),
             backgroundColor: Colors.orange,
-            duration: Duration(seconds: 4),
           ),
         );
       }
@@ -134,7 +192,7 @@ class _BookingDialogState extends State<BookingDialog> {
     }
 
     final reservation = ReservationModel(
-      id: "", // Généré par Firestore
+      id: "", 
       userId: userId,
       prestataireId: widget.article.prestataireId,
       prestataireNom: widget.article.prestataireNom,
@@ -169,24 +227,9 @@ class _BookingDialogState extends State<BookingDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    "Demande de rendez-vous envoyée à ${widget.article.prestataireNom} !",
-                  ),
-                ),
-              ],
-            ),
+            content: Text("Demande de rendez-vous envoyée !"),
             backgroundColor: AppColors.succes,
-            behavior: SnackBarBehavior.floating,
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Erreur lors de la réservation. Réessayez.")),
         );
       }
     }
@@ -210,323 +253,108 @@ class _BookingDialogState extends State<BookingDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Barre de drag
-            Center(
-              child: Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
+            Center(child: Container(width: 48, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)))),
             const SizedBox(height: 16),
-
-            // Titre & Sous-titre
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.rose.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.calendar_month, color: AppColors.rose, size: 26),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Réserver une prestation",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.noir,
-                        ),
-                      ),
-                      Text(
-                        widget.article.titre,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.texteSecondaire,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(color: AppColors.ligne),
+            const Text("Réserver une prestation", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir)),
+            const Divider(),
             const SizedBox(height: 12),
 
-            // Prestataire Info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.roseClair,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.rose.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundImage: NetworkImage(widget.article.prestatairePhoto),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                widget.article.prestataireNom,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (widget.article.prestataireVerified) ...[
-                              const SizedBox(width: 4),
-                              const Icon(Icons.verified, color: Colors.blue, size: 16),
-                            ],
-                          ],
-                        ),
-                        Text(
-                          widget.article.prestataireAdresse,
-                          style: const TextStyle(color: AppColors.texteSecondaire, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    "${widget.article.prix.toInt()} FCFA",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.rose,
-                      fontSize: 15,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
             // Date
-            const Text(
-              "Date souhaitée",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.noir),
-            ),
+            const Text("Date du rendez-vous", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 8),
             InkWell(
               onTap: _pickDate,
-              borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.ligne),
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(border: Border.all(color: AppColors.ligne), borderRadius: BorderRadius.circular(12)),
                 child: Row(
                   children: [
                     const Icon(Icons.event, color: AppColors.rose),
                     const SizedBox(width: 12),
-                    Text(
-                      "${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}",
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                    ),
+                    Text("${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}", style: const TextStyle(fontWeight: FontWeight.bold)),
                     const Spacer(),
-                    const Text("Modifier", style: TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Icon(Icons.edit, size: 16, color: AppColors.rose),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Créneaux horaires
-            const Text(
-              "Créneau horaire disponible",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.noir),
-            ),
+            // Créneaux
+            const Text("Choisir une heure", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _timeSlots.map((slot) {
-                final isSelected = _selectedTimeSlot == slot;
-                return ChoiceChip(
-                  label: Text(slot),
-                  selected: isSelected,
-                  selectedColor: AppColors.rose,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.noir,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  backgroundColor: Colors.grey[100],
-                  onSelected: (selected) {
-                    if (selected) setState(() => _selectedTimeSlot = slot);
-                  },
-                );
-              }).toList(),
-            ),
+            if (_timeSlots.isEmpty)
+              const Text("Aucun horaire disponible pour ce jour.", style: TextStyle(color: Colors.red, fontSize: 12))
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _timeSlots.map((slot) {
+                  final isSelected = _selectedTimeSlot == slot;
+                  return ChoiceChip(
+                    label: Text(slot),
+                    selected: isSelected,
+                    selectedColor: AppColors.rose,
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.noir),
+                    onSelected: (val) => setState(() => _selectedTimeSlot = slot),
+                  );
+                }).toList(),
+              ),
+            
             const SizedBox(height: 20),
 
-            // Lieu de la prestation
-            const Text(
-              "Lieu de prestation",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.noir),
-            ),
+            // Lieu
+            const Text("Lieu de prestation", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => setState(() => _lieuType = LieuPrestation.auSalon),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: BorderSide(
-                        color: _lieuType == LieuPrestation.auSalon ? AppColors.rose : AppColors.ligne,
-                        width: _lieuType == LieuPrestation.auSalon ? 2 : 1,
-                      ),
-                      backgroundColor: _lieuType == LieuPrestation.auSalon ? AppColors.rose.withValues(alpha: 0.08) : Colors.transparent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text("Au salon / Atelier", style: TextStyle(color: AppColors.noir, fontWeight: FontWeight.w600)),
+                  child: ChoiceChip(
+                    label: const Text("Au salon"),
+                    selected: _lieuType == LieuPrestation.auSalon,
+                    onSelected: (val) => setState(() => _lieuType = LieuPrestation.auSalon),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 if (widget.article.prestationADomicile)
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _lieuType = LieuPrestation.aDomicile),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: BorderSide(
-                          color: _lieuType == LieuPrestation.aDomicile ? AppColors.rose : AppColors.ligne,
-                          width: _lieuType == LieuPrestation.aDomicile ? 2 : 1,
-                        ),
-                        backgroundColor: _lieuType == LieuPrestation.aDomicile ? AppColors.rose.withValues(alpha: 0.08) : Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text("À domicile 🏠", style: TextStyle(color: AppColors.noir, fontWeight: FontWeight.w600)),
+                    child: ChoiceChip(
+                      label: const Text("À domicile"),
+                      selected: _lieuType == LieuPrestation.aDomicile,
+                      onSelected: (val) => setState(() => _lieuType = LieuPrestation.aDomicile),
                     ),
                   ),
               ],
             ),
+            
             if (_lieuType == LieuPrestation.aDomicile) ...[
               const SizedBox(height: 12),
               TextField(
                 controller: _addressController,
                 decoration: InputDecoration(
-                  hintText: "Votre adresse complète (Quartier, repère)",
-                  filled: true,
-                  fillColor: Colors.grey[50],
+                  hintText: "Votre adresse",
                   prefixIcon: const Icon(Icons.location_on, color: AppColors.rose),
-                  suffixIcon: IconButton(
-                    icon: _isLocating 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(Icons.my_location, color: _clientPosition != null ? Colors.green : AppColors.rose),
-                    onPressed: _captureClientLocation,
-                    tooltip: "Partager ma position GPS",
-                  ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.ligne)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              if (_clientPosition != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, left: 12),
-                  child: Text(
-                    "✅ Position GPS capturée avec succès",
-                    style: TextStyle(color: Colors.green[700], fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
             ],
-            const SizedBox(height: 16),
 
-            // Instructions / Notes
-            const Text(
-              "Instructions ou précisions pour l'artisan (facultatif)",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.noir),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
             TextField(
               controller: _notesController,
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: "Ex : Longueur souhaitée, apporter du tissu, etc.",
-                filled: true,
-                fillColor: Colors.grey[50],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.ligne)),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Option joindre mesures 3D
-            if (_userProfile?.hasBodyScan ?? false)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.rose.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.rose.withValues(alpha: 0.2)),
-                ),
-                child: CheckboxListTile(
-                  value: _attachMeasurements,
-                  onChanged: (v) => setState(() => _attachMeasurements = v!),
-                  title: const Text("Joindre mes mesures 3D", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text("Permet au styliste de préparer la coupe en avance", style: TextStyle(fontSize: 12)),
-                  activeColor: AppColors.rose,
-                ),
-              ),
-
-            // Notice Aucun Paiement
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.amber[50],
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.shade300),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.info_outline, color: Colors.amber, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "Aucun paiement en ligne. Le règlement s'effectue directement avec l'artisan lors de la prestation.",
-                      style: TextStyle(fontSize: 11, color: Colors.black87),
-                    ),
-                  ),
-                ],
-              ),
+              decoration: const InputDecoration(labelText: "Notes (Optionnel)", border: OutlineInputBorder()),
             ),
             const SizedBox(height: 20),
 
-            // Bouton Confirmer
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 50,
               child: ElevatedButton(
                 onPressed: _isSubmitting ? null : _confirmBooking,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.rose,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
-                ),
-                child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "CONFIRMER LA DEMANDE",
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                      ),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.rose),
+                child: _isSubmitting 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text("CONFIRMER LE RENDEZ-VOUS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
