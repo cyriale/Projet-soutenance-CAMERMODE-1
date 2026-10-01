@@ -1,4 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+/*
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 
@@ -66,6 +67,7 @@ class NotificationService {
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
+
     const androidDetails = AndroidNotificationDetails(
       'camermode_channel',
       'CamerMode Notifications',
@@ -92,3 +94,6 @@ class NotificationService {
     return await _fcm.getToken();
   }
 }
+
+
+ */

@@ -29,7 +29,7 @@ void main() async {
 // Fonction pour charger les services sans faire attendre l'utilisateur
 void _initBackgroundServices() {
   // Initialisation des notifications (Seulement sur Mobile)
-  NotificationService().initialize();
+ // NotificationService().initialize();
   
   // Configuration Firestore (Vitesse optimisée)
   try {
