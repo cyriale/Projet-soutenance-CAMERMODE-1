@@ -3,6 +3,7 @@ import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
 import '../../services/article_service.dart';
 import '../../services/auth_service.dart';
+import '../../compronents/app_cached_image.dart';
 import '../article_detail_screen.dart';
 import 'add_article_screen.dart';
 
@@ -235,16 +236,12 @@ class _PrestataireArticlesScreenState extends State<PrestataireArticlesScreen> {
                     width: 110,
                     height: 120,
                     color: Colors.grey[100],
-                    child: art.imageUrl.isNotEmpty
-                      ? Image.network(
-                          art.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            debugPrint("❌ [UI] Erreur Image.network : ${art.imageUrl}");
-                            return const Center(child: Icon(Icons.broken_image, color: Colors.grey));
-                          },
-                        )
-                      : const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
+                    child: AppCachedImage(
+                      imageUrl: art.imageUrl,
+                      fit: BoxFit.cover,
+                      width: 110,
+                      height: 120,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),

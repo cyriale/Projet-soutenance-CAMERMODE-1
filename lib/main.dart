@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/auth_wrapper.dart';
 import 'core/app_colors.dart';
-import 'services/notification_service.dart';
 import 'firebase_options.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -29,7 +28,7 @@ void main() async {
 // Fonction pour charger les services sans faire attendre l'utilisateur
 void _initBackgroundServices() {
   // Initialisation des notifications (Seulement sur Mobile)
-  NotificationService().initialize();
+ // NotificationService().initialize();
   
   // Configuration Firestore (Vitesse optimisée)
   try {

@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.cyriale.camermode"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

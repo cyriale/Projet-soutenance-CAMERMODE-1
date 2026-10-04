@@ -1,4 +1,3 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -62,8 +61,9 @@ class AuthService {
     String? photoUrl,
   }) async {
     try {
+      final cleanEmail = email.trim().toLowerCase();
       UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email,
+        email: cleanEmail,
         password: password,
       );
       User? user = result.user;
@@ -71,7 +71,7 @@ class AuthService {
       if (user != null) {
         UserModel newUser = UserModel(
           uid: user.uid,
-          email: email,
+          email: cleanEmail,
           nom: nom,
           prenom: prenom,
           role: role,
@@ -92,6 +92,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') return "Cet email est déjà utilisé.";
       if (e.code == 'weak-password') return "Le mot de passe est trop faible.";
+      if (e.code == 'invalid-email') return "Format d'email invalide. Vérifiez l'adresse saisie.";
       return e.message;
     } catch (e) {
       return e.toString();
@@ -102,39 +103,51 @@ class AuthService {
   // Connexion
   Future<String?> signIn(String email, String password) async {
     try {
-      debugPrint("🔑 Tentative de connexion pour : $email");
+      final cleanEmail = email.trim().toLowerCase();
+      debugPrint("🔑 Tentative de connexion pour : $cleanEmail");
       
-      // Cas spécial Admin
-      if (email == 'cyrialesahamene@gmail.com' && password == '12345678') {
-        try {
-          await _auth.signInWithEmailAndPassword(email: email, password: password);
-        } on FirebaseAuthException catch (e) {
-          if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
-            await signUp(
-              email: email, 
-              password: password, 
-              nom: "Admin", 
-              prenom: "CamerMode", 
-              role: UserRole.admin
-            );
-            return null;
-          }
-          return e.message;
-        }
-      } else {
+      if (cleanEmail.isEmpty) {
+        return "Veuillez saisir votre adresse e-mail.";
+      }
+
+      // Traitement automatique des comptes de démo / test
+      final isDemoAccount = cleanEmail == 'cyrialesahamene@gmail.com' ||
+          cleanEmail == 'prestataire@camermode.cm' ||
+          cleanEmail == 'client@camermode.cm';
+
+      try {
         if (kIsWeb) {
           try {
             await _auth.setPersistence(Persistence.LOCAL);
           } catch (_) {}
         }
-        await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+        await _auth.signInWithEmailAndPassword(email: cleanEmail, password: password);
+        return null;
+      } on FirebaseAuthException catch (e) {
+        // Auto-création sécurisée pour les comptes de test si pas encore enregistrés
+        if (isDemoAccount && (e.code == 'user-not-found' || e.code == 'invalid-credential' || e.code == 'invalid-email')) {
+          final role = cleanEmail.contains('admin') || cleanEmail.contains('cyriale')
+              ? UserRole.admin
+              : (cleanEmail.contains('prestataire') ? UserRole.prestataire : UserRole.client);
+
+          await signUp(
+            email: cleanEmail,
+            password: password,
+            nom: role == UserRole.admin ? "Admin" : (role == UserRole.prestataire ? "Atelier" : "Client"),
+            prenom: role == UserRole.admin ? "CamerMode" : "CamerMode",
+            role: role,
+            businessName: role == UserRole.prestataire ? "Atelier Mode Africaine" : null,
+            businessType: role == UserRole.prestataire ? "Couture & Coiffure" : null,
+          );
+          return null;
+        }
+        rethrow;
       }
-      return null;
     } on FirebaseAuthException catch (e) {
       debugPrint("❌ Erreur Auth: ${e.code}");
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') return "Identifiants incorrects.";
       if (e.code == 'wrong-password') return "Mot de passe incorrect.";
-      if (e.code == 'invalid-email') return "Format d'email invalide.";
+      if (e.code == 'invalid-email') return "Format d'email invalide. Exemple valide: utilisateur@domaine.com";
       if (e.code == 'network-request-failed') return "Erreur réseau. Vérifiez votre connexion internet.";
       return e.message ?? "Erreur de connexion.";
     } catch (e) {
@@ -145,9 +158,9 @@ class AuthService {
   // Réinitialisation de mot de passe (Mot de passe oublié)
   Future<String?> sendPasswordResetEmail(String email) async {
     try {
-      final cleanEmail = email.trim();
-      if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
-        return "Veuillez entrer une adresse email valide.";
+      final cleanEmail = email.trim().toLowerCase();
+      if (cleanEmail.isEmpty || !cleanEmail.contains('@') || !cleanEmail.contains('.')) {
+        return "Veuillez entrer une adresse email valide (ex: nom@domaine.com).";
       }
       await _auth.sendPasswordResetEmail(email: cleanEmail);
       return null; // Succès

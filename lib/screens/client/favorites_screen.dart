@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
 import '../../services/dashboard_service.dart';
+import '../../compronents/app_cached_image.dart';
 import '../article_detail_screen.dart';
 import 'prestataire_detail_screen.dart';
 import 'saved_images_screen.dart';
@@ -146,7 +147,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> with SingleTickerProv
                     Expanded(
                       child: ClipRRect(
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                        child: Image.network(art.imageUrl, fit: BoxFit.cover, width: double.infinity),
+                        child: AppCachedImage(imageUrl: art.imageUrl, fit: BoxFit.cover, width: double.infinity),
                       ),
                     ),
                     Padding(

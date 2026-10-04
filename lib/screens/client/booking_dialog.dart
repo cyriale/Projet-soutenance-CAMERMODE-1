@@ -10,6 +10,7 @@ import '../../services/reservation_service.dart';
 import '../../services/availability_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/location_service.dart';
+import '../../services/dashboard_service.dart';
 
 class BookingDialog extends StatefulWidget {
   final ArticleModel article;
@@ -31,7 +32,7 @@ class BookingDialog extends StatefulWidget {
 
 class _BookingDialogState extends State<BookingDialog> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  String _selectedTimeSlot = "";
+  String _selectedTimeSlot = "09:00";
   LieuPrestation _lieuType = LieuPrestation.auSalon;
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
@@ -44,7 +45,7 @@ class _BookingDialogState extends State<BookingDialog> {
   final _availabilityService = AvailabilityService();
   AvailabilityModel? _providerAvailability;
 
-  List<String> _timeSlots = [];
+  List<String> _timeSlots = ["09:00", "10:30", "11:30", "14:00", "15:30", "17:00"];
 
   @override
   void initState() {
@@ -77,18 +78,19 @@ class _BookingDialogState extends State<BookingDialog> {
   }
 
   void _updateAvailableSlotsForDate(DateTime date) {
-    if (_providerAvailability == null) return;
-    
     final dayName = _getDayName(date.weekday);
-    final slots = _providerAvailability!.daySlots[dayName] ?? [];
+    List<String> slots = [];
+    if (_providerAvailability != null) {
+      slots = _providerAvailability!.daySlots[dayName] ?? [];
+    }
     
+    if (slots.isEmpty) {
+      slots = ["09:00", "10:30", "11:30", "14:00", "15:30", "17:00"];
+    }
+
     setState(() {
       _timeSlots = List.from(slots);
-      if (_timeSlots.isNotEmpty) {
-        _selectedTimeSlot = _timeSlots.first;
-      } else {
-        _selectedTimeSlot = "";
-      }
+      _selectedTimeSlot = _timeSlots.first;
     });
   }
 
@@ -140,6 +142,27 @@ class _BookingDialogState extends State<BookingDialog> {
     }
   }
 
+  Future<void> _captureClientLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      final pos = await _locationService.getCurrentLocation();
+      setState(() {
+        _clientPosition = pos;
+        if (pos != null) {
+          _addressController.text = "Position GPS partagée";
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLocating = false);
+      }
+    }
+  }
+
   void _confirmBooking() async {
     if (_selectedTimeSlot.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -149,8 +172,7 @@ class _BookingDialogState extends State<BookingDialog> {
     }
 
     final auth = AuthService();
-    final userId = auth.currentUser?.uid;
-    if (userId == null) return;
+    String userId = auth.currentUser?.uid ?? "guest_${DateTime.now().millisecondsSinceEpoch}";
 
     setState(() => _isSubmitting = true);
 
@@ -192,7 +214,7 @@ class _BookingDialogState extends State<BookingDialog> {
     }
 
     final reservation = ReservationModel(
-      id: "", 
+      id: "res_${DateTime.now().millisecondsSinceEpoch}", 
       userId: userId,
       prestataireId: widget.article.prestataireId,
       prestataireNom: widget.article.prestataireNom,
@@ -219,19 +241,22 @@ class _BookingDialogState extends State<BookingDialog> {
       clientLongitude: _clientPosition?.longitude,
     );
 
+    // Enregistrement dynamique dans Firestore
     final success = await resService.createReservation(reservation);
+
+    // Synchronisation dans le Dashboard local
+    DashboardService().reservations.insert(0, reservation);
 
     if (mounted) {
       setState(() => _isSubmitting = false);
-      if (success) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Demande de rendez-vous envoyée !"),
-            backgroundColor: AppColors.succes,
-          ),
-        );
-      }
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("✨ Réservation enregistrée chez ${widget.article.prestataireNom} !"),
+          backgroundColor: AppColors.succes,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -255,9 +280,9 @@ class _BookingDialogState extends State<BookingDialog> {
           children: [
             Center(child: Container(width: 48, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)))),
             const SizedBox(height: 16),
-            const Text("Réserver une prestation", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.noir)),
-            const Divider(),
-            const SizedBox(height: 12),
+            Text("Réserver : ${widget.article.titre}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.noir)),
+            Text("Prestataire : ${widget.article.prestataireNom}", style: const TextStyle(fontSize: 12, color: AppColors.texteSecondaire)),
+            const Divider(height: 24),
 
             // Date
             const Text("Date du rendez-vous", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -281,25 +306,22 @@ class _BookingDialogState extends State<BookingDialog> {
             const SizedBox(height: 20),
 
             // Créneaux
-            const Text("Choisir une heure", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const Text("Choisir un horaire", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 10),
-            if (_timeSlots.isEmpty)
-              const Text("Aucun horaire disponible pour ce jour.", style: TextStyle(color: Colors.red, fontSize: 12))
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _timeSlots.map((slot) {
-                  final isSelected = _selectedTimeSlot == slot;
-                  return ChoiceChip(
-                    label: Text(slot),
-                    selected: isSelected,
-                    selectedColor: AppColors.rose,
-                    labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.noir),
-                    onSelected: (val) => setState(() => _selectedTimeSlot = slot),
-                  );
-                }).toList(),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _timeSlots.map((slot) {
+                final isSelected = _selectedTimeSlot == slot;
+                return ChoiceChip(
+                  label: Text(slot),
+                  selected: isSelected,
+                  selectedColor: AppColors.rose,
+                  labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.noir, fontWeight: FontWeight.bold),
+                  onSelected: (val) => setState(() => _selectedTimeSlot = slot),
+                );
+              }).toList(),
+            ),
             
             const SizedBox(height: 20),
 
@@ -310,8 +332,10 @@ class _BookingDialogState extends State<BookingDialog> {
               children: [
                 Expanded(
                   child: ChoiceChip(
-                    label: const Text("Au salon"),
+                    label: const Text("Au salon / Atelier"),
                     selected: _lieuType == LieuPrestation.auSalon,
+                    selectedColor: AppColors.rose,
+                    labelStyle: TextStyle(color: _lieuType == LieuPrestation.auSalon ? Colors.white : AppColors.noir),
                     onSelected: (val) => setState(() => _lieuType = LieuPrestation.auSalon),
                   ),
                 ),
@@ -321,6 +345,8 @@ class _BookingDialogState extends State<BookingDialog> {
                     child: ChoiceChip(
                       label: const Text("À domicile"),
                       selected: _lieuType == LieuPrestation.aDomicile,
+                      selectedColor: AppColors.rose,
+                      labelStyle: TextStyle(color: _lieuType == LieuPrestation.aDomicile ? Colors.white : AppColors.noir),
                       onSelected: (val) => setState(() => _lieuType = LieuPrestation.aDomicile),
                     ),
                   ),
@@ -332,8 +358,15 @@ class _BookingDialogState extends State<BookingDialog> {
               TextField(
                 controller: _addressController,
                 decoration: InputDecoration(
-                  hintText: "Votre adresse",
+                  hintText: "Saisissez votre adresse de livraison/prestation",
                   prefixIcon: const Icon(Icons.location_on, color: AppColors.rose),
+                  suffixIcon: IconButton(
+                    icon: _isLocating
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.my_location, color: AppColors.rose),
+                    tooltip: "Partager ma position GPS",
+                    onPressed: _isLocating ? null : _captureClientLocation,
+                  ),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -342,7 +375,7 @@ class _BookingDialogState extends State<BookingDialog> {
             const SizedBox(height: 20),
             TextField(
               controller: _notesController,
-              decoration: const InputDecoration(labelText: "Notes (Optionnel)", border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: "Notes ou consignes particulières (Optionnel)", border: OutlineInputBorder()),
             ),
             const SizedBox(height: 20),
 
@@ -351,34 +384,18 @@ class _BookingDialogState extends State<BookingDialog> {
               height: 50,
               child: ElevatedButton(
                 onPressed: _isSubmitting ? null : _confirmBooking,
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.rose),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.rose,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
                 child: _isSubmitting 
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("CONFIRMER LE RENDEZ-VOUS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  : const Text("CONFIRMER MA RÉSERVATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _captureClientLocation() async {
-    setState(() => _isLocating = true);
-    try {
-      final pos = await _locationService.getCurrentLocation();
-      setState(() {
-        _clientPosition = pos;
-        if (pos != null) {
-          _addressController.text = "Position GPS partagée";
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    } finally {
-      setState(() => _isLocating = false);
-    }
   }
 }

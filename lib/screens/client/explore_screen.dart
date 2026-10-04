@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/article_model.dart';
 import '../../services/dashboard_service.dart';
+import '../../compronents/app_cached_image.dart';
 import '../article_detail_screen.dart';
 import 'virtual_try_on_screen.dart';
 
@@ -175,7 +176,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   Expanded(
                                     child: ClipRRect(
                                       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                      child: Image.network(art.imageUrl, fit: BoxFit.cover, width: double.infinity),
+                                      child: AppCachedImage(imageUrl: art.imageUrl, fit: BoxFit.cover, width: double.infinity),
                                     ),
                                   ),
                                   Padding(
