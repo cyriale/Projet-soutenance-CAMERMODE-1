@@ -17,6 +17,10 @@ migrate_working_dir/
 functions/.env
 functions/.runtimeconfig.json
 
+# Node modules
+node_modules/
+functions/node_modules/
+
 # IntelliJ related
 *.iml
 *.ipr
