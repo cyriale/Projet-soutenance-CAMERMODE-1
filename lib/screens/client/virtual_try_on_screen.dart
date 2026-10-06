@@ -224,9 +224,6 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       }
     }
   }
-  // =========================================================
-  // IMPORT PHOTO
-  // =========================================================
 
   Widget _buildGeneratingOverlay() {
     return Positioned.fill(
