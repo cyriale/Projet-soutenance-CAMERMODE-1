@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    final email = _emailController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
@@ -41,10 +41,20 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    if (!email.contains('@') || !email.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Format d'email invalide. Exemple valide: nom@domaine.com"),
+          backgroundColor: AppColors.erreur,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final error = await _authService.signIn(
-      email.toLowerCase(),
+      email,
       password,
     );
 

@@ -380,39 +380,45 @@ class _AddArticleScreenState extends State<AddArticleScreen> {
               ),
               const Text("Choisir une photo", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: AppColors.rose.withOpacity(0.1), shape: BoxShape.circle),
-                  child: const Icon(Icons.camera_alt, color: AppColors.rose),
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: AppColors.rose.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.camera_alt, color: AppColors.rose),
+                  ),
+                  title: const Text('Prendre une photo (Appareil photo)'),
+                  subtitle: const Text('Prenez directement un cliché de votre création'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await viewModel.pickImage(ImageSource.camera);
+                    if (viewModel.imageFile != null) {
+                      final bytes = await viewModel.imageFile!.readAsBytes();
+                      setState(() => _imageBytes = bytes);
+                    }
+                  },
                 ),
-                title: const Text('Prendre une photo (Appareil photo)'),
-                subtitle: const Text('Prenez directement un cliché de votre création'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await viewModel.pickImage(ImageSource.camera);
-                  if (viewModel.imageFile != null) {
-                    final bytes = await viewModel.imageFile!.readAsBytes();
-                    setState(() => _imageBytes = bytes);
-                  }
-                },
               ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle),
-                  child: const Icon(Icons.photo_library, color: Colors.blue),
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.photo_library, color: Colors.blue),
+                  ),
+                  title: const Text('Importer depuis la galerie (Exporter)'),
+                  subtitle: const Text('Choisissez une photo existante dans votre téléphone'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await viewModel.pickImage(ImageSource.gallery);
+                    if (viewModel.imageFile != null) {
+                      final bytes = await viewModel.imageFile!.readAsBytes();
+                      setState(() => _imageBytes = bytes);
+                    }
+                  },
                 ),
-                title: const Text('Importer depuis la galerie (Exporter)'),
-                subtitle: const Text('Choisissez une photo existante dans votre téléphone'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await viewModel.pickImage(ImageSource.gallery);
-                  if (viewModel.imageFile != null) {
-                    final bytes = await viewModel.imageFile!.readAsBytes();
-                    setState(() => _imageBytes = bytes);
-                  }
-                },
               ),
             ],
           ),

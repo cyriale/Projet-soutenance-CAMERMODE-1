@@ -48,51 +48,57 @@ class _SignupScreenState extends State<SignupScreen> {
           children: [
             const Text("Photo de profil", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: AppColors.rose),
-              title: const Text("Prendre une photo (Caméra)"),
-              onTap: () async {
-                Navigator.pop(modalCtx);
-                final hasPermission = await _permissionService.requestCameraPermission();
-                if (!mounted) return;
-                if (!hasPermission) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Permission caméra refusée")),
-                  );
-                  return;
-                }
-                final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                if (picked != null && mounted) {
-                  final bytes = await picked.readAsBytes();
-                  setState(() {
-                    _profileImage = picked;
-                    _profileImageBytes = bytes;
-                  });
-                }
-              },
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: const Icon(Icons.camera_alt, color: AppColors.rose),
+                title: const Text("Prendre une photo (Caméra)"),
+                onTap: () async {
+                  Navigator.pop(modalCtx);
+                  final hasPermission = await _permissionService.requestCameraPermission();
+                  if (!mounted) return;
+                  if (!hasPermission) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Permission caméra refusée")),
+                    );
+                    return;
+                  }
+                  final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                  if (picked != null && mounted) {
+                    final bytes = await picked.readAsBytes();
+                    setState(() {
+                      _profileImage = picked;
+                      _profileImageBytes = bytes;
+                    });
+                  }
+                },
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: AppColors.rose),
-              title: const Text("Choisir depuis la galerie"),
-              onTap: () async {
-                Navigator.pop(modalCtx);
-                final hasPermission = await _permissionService.requestPhotosPermission();
-                if (!mounted) return;
-                if (!hasPermission) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Permission galerie refusée")),
-                  );
-                  return;
-                }
-                final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-                if (picked != null && mounted) {
-                  final bytes = await picked.readAsBytes();
-                  setState(() {
-                    _profileImage = picked;
-                    _profileImageBytes = bytes;
-                  });
-                }
-              },
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: const Icon(Icons.photo_library, color: AppColors.rose),
+                title: const Text("Choisir depuis la galerie"),
+                onTap: () async {
+                  Navigator.pop(modalCtx);
+                  final hasPermission = await _permissionService.requestPhotosPermission();
+                  if (!mounted) return;
+                  if (!hasPermission) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Permission galerie refusée")),
+                    );
+                    return;
+                  }
+                  final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                  if (picked != null && mounted) {
+                    final bytes = await picked.readAsBytes();
+                    setState(() {
+                      _profileImage = picked;
+                      _profileImageBytes = bytes;
+                    });
+                  }
+                },
+              ),
             ),
           ],
         ),

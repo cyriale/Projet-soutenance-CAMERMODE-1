@@ -5,6 +5,7 @@ import '../models/article_model.dart';
 import '../services/dashboard_service.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
+import '../compronents/app_cached_image.dart';
 import 'client/booking_dialog.dart';
 import 'client/chat_conversation_screen.dart';
 import 'client/prestataire_detail_screen.dart';
@@ -136,13 +137,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        currentArticle.imageUrl,
+                      AppCachedImage(
+                        imageUrl: currentArticle.imageUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: AppColors.roseClair,
-                          child: const Icon(Icons.image, size: 100, color: Colors.white),
-                        ),
                       ),
                       Positioned(
                         bottom: 0,

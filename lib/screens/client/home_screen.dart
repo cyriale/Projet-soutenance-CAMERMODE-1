@@ -8,6 +8,7 @@ import '../../services/dashboard_service.dart';
 import '../../services/ai_recommendation_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
+import '../../compronents/app_cached_image.dart';
 import '../article_detail_screen.dart';
 import 'prestataire_detail_screen.dart';
 import 'share_sheet.dart';
@@ -83,7 +84,9 @@ class _HomeScreenState extends State<HomeScreen> {
           return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppColors.rose)));
         }
 
-        final allArticles = snapshot.data ?? [];
+        final firestoreArticles = snapshot.data ?? [];
+        final allArticles = firestoreArticles.isNotEmpty ? firestoreArticles : DashboardService().articles;
+
         List<ArticleModel> filtered = _activeTab == "Pour vous" 
             ? _recommendationService.getPersonalizedFeed(allArticles, _currentUser)
             : allArticles;
@@ -238,34 +241,40 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(height: 8),
                                 const Text("Scannez votre silhouette ou votre visage pour obtenir des recommandations 100% personnalisées.", style: TextStyle(color: AppColors.texteSecondaire, fontSize: 13)),
                                 const SizedBox(height: 20),
-                                ListTile(
-                                  leading: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(color: AppColors.rose.withOpacity(0.1), shape: BoxShape.circle),
-                                    child: const Icon(Icons.accessibility_new, color: AppColors.rose),
+                                Material(
+                                  color: Colors.transparent,
+                                  child: ListTile(
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(color: AppColors.rose.withOpacity(0.1), shape: BoxShape.circle),
+                                      child: const Icon(Icons.accessibility_new, color: AppColors.rose),
+                                    ),
+                                    title: const Text("Scan Morphologique Corporel 3D", style: TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Text(_currentUser?.morphologieType != null ? "Actuel : ${_currentUser!.morphologieType}" : "Mesurez votre silhouette pour la couture"),
+                                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyScanScreen())).then((_) => _loadUser());
+                                    },
                                   ),
-                                  title: const Text("Scan Morphologique Corporel 3D", style: TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(_currentUser?.morphologieType != null ? "Actuel : ${_currentUser!.morphologieType}" : "Mesurez votre silhouette pour la couture"),
-                                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyScanScreen())).then((_) => _loadUser());
-                                  },
                                 ),
                                 const Divider(),
-                                ListTile(
-                                  leading: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), shape: BoxShape.circle),
-                                    child: const Icon(Icons.face_retouching_natural, color: Colors.purple),
+                                Material(
+                                  color: Colors.transparent,
+                                  child: ListTile(
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), shape: BoxShape.circle),
+                                      child: const Icon(Icons.face_retouching_natural, color: Colors.purple),
+                                    ),
+                                    title: const Text("Scan Visage & Morphologie Coiffure", style: TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Text(_currentUser?.formeVisage != null ? "Actuel : ${_currentUser!.formeVisage}" : "Détectez votre forme de visage pour vos coiffures"),
+                                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => const FaceScanScreen())).then((_) => _loadUser());
+                                    },
                                   ),
-                                  title: const Text("Scan Visage & Morphologie Coiffure", style: TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(_currentUser?.formeVisage != null ? "Actuel : ${_currentUser!.formeVisage}" : "Détectez votre forme de visage pour vos coiffures"),
-                                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const FaceScanScreen())).then((_) => _loadUser());
-                                  },
                                 ),
                                 const SizedBox(height: 12),
                               ],
@@ -470,25 +479,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                    child: Image.network(
-                      article.imageUrl,
+                    child: AppCachedImage(
+                      imageUrl: article.imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
-                      // Forcer le rendu HTML pour éviter les erreurs CORS sur Web
-                      key: ValueKey(article.imageUrl),
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.broken_image, color: Colors.grey),
-                              Text("Image non trouvée", style: TextStyle(fontSize: 8, color: Colors.grey)),
-                            ],
-                          ),
-                        );
-                      },
                     ),
                   ),
                 ),

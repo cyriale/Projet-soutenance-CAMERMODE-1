@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/dashboard_service.dart';
+import '../../compronents/app_cached_image.dart';
 import '../article_detail_screen.dart';
 import 'share_sheet.dart';
 
@@ -86,7 +87,7 @@ class SavedImagesScreen extends StatelessWidget {
                                 Expanded(
                                   child: ClipRRect(
                                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                    child: Image.network(art.imageUrl, fit: BoxFit.cover, width: double.infinity),
+                                    child: AppCachedImage(imageUrl: art.imageUrl, fit: BoxFit.cover, width: double.infinity),
                                   ),
                                 ),
                                 Padding(

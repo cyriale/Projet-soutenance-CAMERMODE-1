@@ -1,4 +1,4 @@
-
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../complete_profile_screen.dart';
@@ -14,6 +14,7 @@ import 'face_scan_screen.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/dashboard_service.dart';
+import '../../compronents/app_cached_image.dart';
 
 class ProfileScreen extends StatelessWidget {
   final UserModel? user;
@@ -68,11 +69,11 @@ class ProfileScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.symmetric(vertical: 20),
             children: [
-              // Header Profil
+              // Header Profil Dynamique
               _buildProfileHeader(context, dashboardService),
               const SizedBox(height: 24),
 
-              // Section Activité & Mode
+              // Section Activité & Mode Dynamique
               _buildSectionTitle("MON UNIVERS MODE & BEAUTÉ"),
               _buildProfileItem(
                 Icons.bookmark_border,
@@ -104,23 +105,46 @@ class ProfileScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Mes Essayages Enregistrés", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text("Mes Essayages Enregistrés", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.noir)),
+                              Text("${savedTryOns.length} sauvegardé(s)", style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
+                          ),
                           const SizedBox(height: 12),
                           if (savedTryOns.isEmpty)
                             const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 20),
-                              child: Center(child: Text("Aucun essayage enregistré pour le moment.")),
+                              padding: EdgeInsets.symmetric(vertical: 30),
+                              child: Center(child: Text("Aucun essayage enregistré pour le moment.", style: TextStyle(color: AppColors.texteGris))),
                             )
                           else
-                            ...savedTryOns.map((t) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(t['imageUrl'], width: 48, height: 48, fit: BoxFit.cover),
+                            SizedBox(
+                              height: 300,
+                              child: ListView.separated(
+                                itemCount: savedTryOns.length,
+                                separatorBuilder: (_, __) => const Divider(),
+                                itemBuilder: (context, index) {
+                                  final t = savedTryOns[index];
+                                  final String imgUrl = t['imageUrl'] ?? "";
+                                  return ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: AppCachedImage(
+                                        imageUrl: imgUrl,
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    title: Text(t['articleTitre'] ?? "Essayage", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    subtitle: Text("Couleur : ${t['colorName']} • Taille : ${t['size']}", style: const TextStyle(fontSize: 11, color: AppColors.texteGris)),
+                                    trailing: const Icon(Icons.check_circle, color: AppColors.succes, size: 18),
+                                  );
+                                },
                               ),
-                              title: Text(t['articleTitre'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              subtitle: Text("Couleur : ${t['colorName']} • Taille : ${t['size']}", style: const TextStyle(fontSize: 11)),
-                            )),
+                            ),
                         ],
                       ),
                     ),
@@ -130,7 +154,7 @@ class ProfileScreen extends StatelessWidget {
               _buildProfileItem(
                 Icons.straighten,
                 "Mensurations & Morphologie",
-                badge: user?.morphologieType,
+                badge: user?.morphologieType ?? "Non définie",
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CompleteProfileScreen(type: ArticleType.couture)),
@@ -174,7 +198,7 @@ class ProfileScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Mes Avis Clients Vérifiés", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          const Text("Mes Avis Clients Vérifiés", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.noir)),
                           const SizedBox(height: 12),
                           if (myReviews.isEmpty)
                             const Padding(
@@ -202,7 +226,6 @@ class ProfileScreen extends StatelessWidget {
               ),
               
               const SizedBox(height: 20),
-              // Section Sécurité & Confidentialité (Section 18)
               _buildSectionTitle("SÉCURITÉ & CONFIDENTIALITÉ"),
               _buildProfileItem(
                 Icons.notifications_none,
@@ -308,6 +331,12 @@ class ProfileScreen extends StatelessWidget {
       );
     }
 
+    final ImageProvider? avatarImageProvider = user!.photoUrl != null && user!.photoUrl!.isNotEmpty
+        ? (user!.photoUrl!.startsWith("http")
+            ? NetworkImage(user!.photoUrl!)
+            : FileImage(File(user!.photoUrl!)) as ImageProvider)
+        : null;
+
     return Center(
       child: Column(
         children: [
@@ -320,12 +349,10 @@ class ProfileScreen extends StatelessWidget {
             child: CircleAvatar(
               radius: 46,
               backgroundColor: Colors.white,
-              backgroundImage: user!.photoUrl != null && user!.photoUrl!.isNotEmpty
-                  ? NetworkImage(user!.photoUrl!)
-                  : null,
-              child: user!.photoUrl == null || user!.photoUrl!.isEmpty
+              backgroundImage: avatarImageProvider,
+              child: avatarImageProvider == null
                   ? Text(
-                      user!.nom[0].toUpperCase(),
+                      user!.nom.isNotEmpty ? user!.nom[0].toUpperCase() : "U",
                       style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.rose),
                     )
                   : null,
@@ -384,28 +411,31 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProfileItem(IconData icon, String title, {Color? color, String? badge, VoidCallback? onTap}) {
-    return ListTile(
-      leading: Icon(icon, color: color ?? AppColors.noir, size: 22),
-      title: Text(title, style: TextStyle(color: color ?? AppColors.noir, fontWeight: FontWeight.w500, fontSize: 14)),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (badge != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.rose.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Icon(icon, color: color ?? AppColors.noir, size: 22),
+        title: Text(title, style: TextStyle(color: color ?? AppColors.noir, fontWeight: FontWeight.w500, fontSize: 14)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (badge != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.rose.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(badge, style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold, fontSize: 12)),
               ),
-              child: Text(badge, style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold, fontSize: 12)),
-            ),
-            const SizedBox(width: 8),
+              const SizedBox(width: 8),
+            ],
+            const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.texteSecondaire),
           ],
-          const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.texteSecondaire),
-        ],
+        ),
+        onTap: onTap ?? () {},
+        contentPadding: const EdgeInsets.symmetric(horizontal: 24),
       ),
-      onTap: onTap ?? () {},
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
     );
   }
 }

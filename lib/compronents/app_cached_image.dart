@@ -1,11 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/app_colors.dart';
 
-/// COMPOSANT HARMONISÉ D'AFFICHAGE D'IMAGES AVEC CACHE ET OPTIMISATION MR SERGIO
-/// Utilise `cached_network_image` pour mettre en cache les images de storage.mrsergio.dev.
+/// COMPOSANT UNIVERSEL D'AFFICHAGE D'IMAGES SÉCURISÉ (BASE64, WEB, MOBILE, FICHIERS LOCAUX & HTTP)
 class AppCachedImage extends StatelessWidget {
   final String imageUrl;
   final double? width;
@@ -22,68 +22,139 @@ class AppCachedImage extends StatelessWidget {
     this.borderRadius,
   });
 
+  /// Traitement et sécurisation de l'URL
+  String _getProcessedUrl(String url) {
+    var clean = url.trim();
+    if (clean.contains("images.unsplash.com") && clean.contains("auto=format")) {
+      clean = clean.split("?").first;
+    }
+
+    if (kIsWeb && (clean.startsWith("http://") || clean.startsWith("https://")) && !clean.contains("weserv.nl")) {
+      return "https://images.weserv.nl/?url=${Uri.encodeComponent(clean)}";
+    }
+
+    return clean;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (imageUrl.isEmpty) {
+    final rawCleanUrl = imageUrl.trim();
+
+    if (rawCleanUrl.isEmpty) {
       return _buildErrorPlaceholder();
     }
 
-    // 1. Image distante (ex: https://storage.mrsergio.dev/...)
-    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
-      final widget = CachedNetworkImage(
-        imageUrl: imageUrl,
+    Widget imageWidget;
+
+    // 1. BASE64 DATA URI (Images générées par Nano Banana 2 IA)
+    if (rawCleanUrl.startsWith("data:image/") || rawCleanUrl.startsWith("data:application/")) {
+      try {
+        final String base64Data = rawCleanUrl.contains(",") ? rawCleanUrl.split(",").last : rawCleanUrl;
+        final Uint8List bytes = base64Decode(base64Data);
+        imageWidget = Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+        );
+        if (borderRadius != null) {
+          return ClipRRect(borderRadius: borderRadius!, child: imageWidget);
+        }
+        return imageWidget;
+      } catch (e) {
+        debugPrint("Erreur décodage Base64 AppCachedImage : $e");
+        return _buildErrorPlaceholder();
+      }
+    }
+
+    final processedUrl = _getProcessedUrl(rawCleanUrl);
+
+    // 2. SUR WEB (kIsWeb) : Image.network
+    if (kIsWeb) {
+      imageWidget = Image.network(
+        processedUrl,
         width: width,
         height: height,
         fit: fit,
-        placeholder: (context, url) => Container(
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _buildLoadingPlaceholder();
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return Image.network(
+            rawCleanUrl,
+            width: width,
+            height: height,
+            fit: fit,
+            errorBuilder: (c, e, s) => _buildErrorPlaceholder(),
+          );
+        },
+      );
+    }
+    // 3. URLs HTTP / HTTPS (Mobile & Desktop)
+    else if (rawCleanUrl.startsWith("http://") || rawCleanUrl.startsWith("https://")) {
+      imageWidget = CachedNetworkImage(
+        imageUrl: rawCleanUrl,
+        width: width,
+        height: height,
+        fit: fit,
+        placeholder: (context, url) => _buildLoadingPlaceholder(),
+        errorWidget: (context, url, error) => Image.network(
+          processedUrl,
           width: width,
           height: height,
-          color: Colors.grey[200],
-          child: const Center(
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.rose),
-            ),
-          ),
+          fit: fit,
+          errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
         ),
-        errorWidget: (context, url, error) => _buildErrorPlaceholder(),
       );
-
-      if (borderRadius != null) {
-        return ClipRRect(borderRadius: borderRadius!, child: widget);
-      }
-      return widget;
     }
-
-    // 2. Web Blob / Network fallback
-    if (kIsWeb) {
-      final widget = Image.network(
-        imageUrl,
+    // 4. FICHIERS LOCAUX (Caméra / Galerie)
+    else if (rawCleanUrl.startsWith("/") || rawCleanUrl.startsWith("file://")) {
+      final String cleanPath = rawCleanUrl.replaceFirst("file://", "");
+      final file = File(cleanPath);
+      if (file.existsSync()) {
+        imageWidget = Image.file(
+          file,
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+        );
+      } else {
+        imageWidget = _buildErrorPlaceholder();
+      }
+    }
+    // 5. FALLBACK SÉCURISÉ
+    else {
+      imageWidget = Image.network(
+        processedUrl,
         width: width,
         height: height,
         fit: fit,
         errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
       );
-      if (borderRadius != null) {
-        return ClipRRect(borderRadius: borderRadius!, child: widget);
-      }
-      return widget;
     }
-
-    // 3. Fichier local Mobile (Caméra / Galerie)
-    final widget = Image.file(
-      File(imageUrl),
-      width: width,
-      height: height,
-      fit: fit,
-      errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
-    );
 
     if (borderRadius != null) {
-      return ClipRRect(borderRadius: borderRadius!, child: widget);
+      return ClipRRect(borderRadius: borderRadius!, child: imageWidget);
     }
-    return widget;
+    return imageWidget;
+  }
+
+  Widget _buildLoadingPlaceholder() {
+    return Container(
+      width: width,
+      height: height,
+      color: AppColors.roseClair,
+      child: const Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.rose),
+        ),
+      ),
+    );
   }
 
   Widget _buildErrorPlaceholder() {
@@ -95,7 +166,14 @@ class AppCachedImage extends StatelessWidget {
         borderRadius: borderRadius,
       ),
       child: const Center(
-        child: Icon(Icons.checkroom, color: AppColors.rose, size: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.checkroom, color: AppColors.rose, size: 28),
+            SizedBox(height: 2),
+            Text("CamerMode", style: TextStyle(fontSize: 9, color: AppColors.rose, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
