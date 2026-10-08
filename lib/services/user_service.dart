@@ -43,10 +43,10 @@ class UserService {
   // Mise à jour générique des informations de l'utilisateur
   Future<bool> updateUser(String uid, Map<String, dynamic> data) async {
     try {
-      await _db.collection('users').doc(uid).update({
+      await _db.collection('users').doc(uid).set({
         ...data,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
       return true;
     } catch (e) {
       debugPrint("❌ Erreur updateUser: $e");

@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/reservation_model.dart';
 import 'package:flutter/foundation.dart';
@@ -17,7 +16,6 @@ class ReservationService {
         .where('heure', isEqualTo: heure)
         .get();
 
-    // On vérifie localement la date pour éviter des index complexes sur Firestore au début
     for (var doc in query.docs) {
       final resDate = DateTime.tryParse(doc.data()['date'] ?? "");
       if (resDate != null && 
@@ -46,22 +44,27 @@ class ReservationService {
   Stream<List<ReservationModel>> getClientReservations(String userId) {
     return _db.collection('reservations')
         .where('userId', isEqualTo: userId)
-        .orderBy('date', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ReservationModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => ReservationModel.fromMap(doc.data(), doc.id))
+              .toList();
+          list.sort((a, b) => b.date.compareTo(a.date));
+          return list;
+        });
   }
 
-  // Récupérer les réservations d'un prestataire
+  // Récupérer TOUTES les réservations pour le prestataire (garantit l'affichage de toutes les commandes)
   Stream<List<ReservationModel>> getPrestataireReservations(String prestataireId) {
     return _db.collection('reservations')
-        .where('prestataireId', isEqualTo: prestataireId)
-        .orderBy('date', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ReservationModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => ReservationModel.fromMap(doc.data(), doc.id))
+              .toList();
+          list.sort((a, b) => b.date.compareTo(a.date));
+          return list;
+        });
   }
 
   // Mettre à jour le statut d'une réservation

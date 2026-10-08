@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/user_model.dart';
+import '../../services/dashboard_service.dart';
 import '../../services/user_service.dart';
 import '../../services/verification_service.dart';
 
@@ -61,6 +62,10 @@ class EditProfileViewModel extends ChangeNotifier {
       // 3. Sauvegarder dans Firestore
       final success = await _userService.updateUser(user.uid, data);
       
+      if (success) {
+        await DashboardService().reloadUserProfile();
+      }
+
       _isLoading = false;
       notifyListeners();
       return success;

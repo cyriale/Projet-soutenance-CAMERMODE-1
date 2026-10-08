@@ -538,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: EdgeInsets.zero,
                           icon: Icon(
                             article.isFavorite ? Icons.bookmark : Icons.bookmark_border,
-                            color: article.isFavorite ? AppColors.rose : AppColors.noir,
+                            color: article.isFavorite ? const Color(0xFFD2A85F) : AppColors.noir,
                             size: 18,
                           ),
                           onPressed: () => _dashboardService.toggleFavorite(article.id),

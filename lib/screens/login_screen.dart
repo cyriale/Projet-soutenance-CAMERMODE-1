@@ -28,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    FocusScope.of(context).unfocus();
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
 

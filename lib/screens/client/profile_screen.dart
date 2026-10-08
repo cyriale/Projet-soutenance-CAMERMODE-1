@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../complete_profile_screen.dart';
@@ -127,20 +128,63 @@ class ProfileScreen extends StatelessWidget {
                                 itemBuilder: (context, index) {
                                   final t = savedTryOns[index];
                                   final String imgUrl = t['imageUrl'] ?? "";
-                                  return ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: AppCachedImage(
-                                        imageUrl: imgUrl,
-                                        width: 52,
-                                        height: 52,
-                                        fit: BoxFit.cover,
+                                  final Uint8List? aiResultBytes = t['aiResultBytes'];
+
+                                  return InkWell(
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _showTryOnDetailDialog(context, t);
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 6),
+                                      child: Row(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: AppCachedImage(
+                                              imageUrl: imgUrl,
+                                              width: 48,
+                                              height: 48,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          const Icon(Icons.arrow_forward, size: 14, color: AppColors.texteGris),
+                                          const SizedBox(width: 6),
+                                          if (aiResultBytes != null)
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Image.memory(
+                                                aiResultBytes,
+                                                width: 48,
+                                                height: 48,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              width: 48,
+                                              height: 48,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.rose.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(Icons.auto_awesome, size: 18, color: AppColors.rose),
+                                            ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(t['articleTitre'] ?? "Essayage", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                Text("Couleur : ${t['colorName']} • Taille : ${t['size']}", style: const TextStyle(fontSize: 11, color: AppColors.texteGris)),
+                                              ],
+                                            ),
+                                          ),
+                                          const Icon(Icons.visibility, color: AppColors.rose, size: 18),
+                                        ],
                                       ),
                                     ),
-                                    title: Text(t['articleTitre'] ?? "Essayage", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                    subtitle: Text("Couleur : ${t['colorName']} • Taille : ${t['size']}", style: const TextStyle(fontSize: 11, color: AppColors.texteGris)),
-                                    trailing: const Icon(Icons.check_circle, color: AppColors.succes, size: 18),
                                   );
                                 },
                               ),
@@ -435,6 +479,112 @@ class ProfileScreen extends StatelessWidget {
         ),
         onTap: onTap ?? () {},
         contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      ),
+    );
+  }
+
+  void _showTryOnDetailDialog(BuildContext context, Map<String, dynamic> t) {
+    final String articleImgUrl = t['imageUrl'] ?? "";
+    final Uint8List? aiResultBytes = t['aiResultBytes'];
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      t['articleTitre'] ?? "Détail de l'essayage",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "Couleur : ${t['colorName']} • Taille : ${t['size']}",
+                style: const TextStyle(color: AppColors.texteGris, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              const Text("Article & Résultat de l'IA :", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 280,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Text("Article", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: AppCachedImage(imageUrl: articleImgUrl, fit: BoxFit.cover, width: double.infinity),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Text("Résultat IA", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: aiResultBytes != null
+                                  ? Image.memory(aiResultBytes, fit: BoxFit.cover, width: double.infinity)
+                                  : Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Text("Aucun rendu IA", style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.check, size: 16),
+                  label: const Text("Fermer"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.rose,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

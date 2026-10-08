@@ -99,7 +99,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     child: IconButton(
                       icon: Icon(
                         currentArticle.isFavorite ? Icons.bookmark : Icons.bookmark_border,
-                        color: currentArticle.isFavorite ? AppColors.rose : AppColors.noir,
+                        color: currentArticle.isFavorite ? const Color(0xFFD2A85F) : AppColors.noir,
                         size: 20,
                       ),
                       onPressed: () => _service.toggleFavorite(currentArticle.id),

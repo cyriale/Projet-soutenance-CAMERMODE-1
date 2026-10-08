@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/auth_wrapper.dart';
@@ -9,6 +10,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 void main() async {
   // 1. Initialisation de base ultra-rapide
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Configuration du style des barres système pour éviter les mélanges avec l'appareil
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
   
   // Chargement des variables d'environnement
   await dotenv.load(fileName: ".env");
